@@ -48,3 +48,7 @@ Role: Frontend Developer & API Routes Implementer
 All our UI designs can be found at the following excalidraw document:
 
 https://link.excalidraw.com/l/81G1x30cW02/79UafFrxW9H
+
+# Database Designs:
+
+The database designs can also be found at the excalidraw document, in a visual fashion.
