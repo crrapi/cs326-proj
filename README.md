@@ -42,3 +42,9 @@ Role: Frontend Developer & API Routes Implementer
   1. Create frontend user interface components (buttons, forms, inputs)
   2. Design and implement page layout and navigation structure
   3. Develop Express API routes that connect frontend with database schema and stock API interface
+
+# UI Designs
+
+All our UI designs can be found at the following excalidraw document:
+
+https://link.excalidraw.com/l/81G1x30cW02/79UafFrxW9H
