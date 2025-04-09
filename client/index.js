@@ -1,5 +1,9 @@
 import './style.css';
 import p5 from 'p5';
+import { openDB, addStock, getAllStocks, deleteStock } from './db.js';
+
+let currentPortfolio = []; // Holds the stocks loaded from IndexedDB
+let p5Instance = null; // To hold the p5 sketch instance
 
 const createDate = (day) => {
   const date = new Date(2024, 3, 1);
@@ -264,3 +268,146 @@ const sketch = (p) => {
 };
 
 new p5(sketch);
+
+document.addEventListener('DOMContentLoaded', () => {
+  const addStockForm = document.querySelector('.portfolio-input form');
+  const tickerInput = document.getElementById('ticker');
+  const quantityInput = document.getElementById('quantity');
+  const purchaseDateInput = document.getElementById('purchase-date');
+  const purchasePriceInput = document.getElementById('purchase-price');
+  const submitButton = addStockForm.querySelector('button[type="submit"]');
+
+  function validateForm() {
+      let isValid = true;
+      clearErrors();
+
+      if (!tickerInput.value.trim()) {
+          showError(tickerInput, 'Ticker symbol is required.');
+          isValid = false;
+      }
+
+      const quantity = parseFloat(quantityInput.value);
+      if (isNaN(quantity) || quantity <= 0) {
+          showError(quantityInput, 'Quantity must be a positive number.');
+          isValid = false;
+      }
+
+      if (!purchaseDateInput.value) {
+          showError(purchaseDateInput, 'Purchase date is required.');
+          isValid = false;
+      }
+
+      const price = parseFloat(purchasePriceInput.value);
+      if (isNaN(price) || price <= 0) {
+          showError(purchasePriceInput, 'Purchase price must be a positive number.');
+          isValid = false;
+      }
+
+      return isValid;
+  }
+
+  function showError(inputElement, message) {
+      const formGroup = inputElement.closest('.form-group');
+      const errorElement = document.createElement('p');
+      errorElement.className = 'error-message';
+      errorElement.style.color = 'red';
+      errorElement.style.fontSize = '0.8em';
+      errorElement.textContent = message;
+      formGroup.appendChild(errorElement);
+      inputElement.classList.add('input-error');
+  }
+
+  function clearErrors() {
+      document.querySelectorAll('.error-message').forEach(el => el.remove());
+      document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+  }
+
+  function showSuccessMessage(message) {
+      const successElement = document.createElement('p');
+      successElement.textContent = message;
+      successElement.style.color = 'green';
+      successElement.style.marginTop = '10px';
+      addStockForm.appendChild(successElement);
+      setTimeout(() => successElement.remove(), 3000);
+  }
+
+  addStockForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (validateForm()) {
+          const newStock = {
+              ticker: tickerInput.value.trim().toUpperCase(),
+              quantity: parseFloat(quantityInput.value),
+              purchaseDate: purchaseDateInput.value, 
+              purchasePrice: parseFloat(purchasePriceInput.value)
+          };
+
+          try {
+              await addStock(newStock);
+              showSuccessMessage('Stock added successfully!');
+              addStockForm.reset(); 
+              clearErrors();
+              await loadPortfolioAndUpdateUI();
+          } catch (error) {
+              console.error("Failed to add stock:", error);
+              showError(submitButton, 'Failed to save stock. See console.');
+          }
+      }
+  });
+
+  async function initializeApp() {
+      try {
+          await openDB();
+          await loadPortfolioAndUpdateUI();
+      } catch (error) {
+          console.error("Initialization failed:", error);
+      }
+  }
+
+  initializeApp();
+});
+
+async function loadPortfolioAndUpdateUI() {
+  try {
+      currentPortfolio = await getAllStocks();
+      console.log("Loaded portfolio:", currentPortfolio);
+
+      if (p5Instance) {
+          p5Instance.updateData(currentPortfolio);
+      }
+
+      updateStats(currentPortfolio);
+
+  } catch (error) {
+      console.error("Error loading portfolio or updating UI:", error);
+  }
+}
+
+function updateStats(portfolio) {
+  const statsContainer = document.querySelector('.portfolio-stats');
+  if (!statsContainer) return;
+
+  const numStocks = portfolio.length;
+
+  const totalPurchaseValue = portfolio.reduce((sum, stock) => sum + (stock.purchasePrice * stock.quantity), 0);
+  const uniqueTickers = new Set(portfolio.map(s => s.ticker)).size;
+
+  const valueCard = statsContainer.querySelector('.stat-card:nth-child(1) p');
+  const returnCard = statsContainer.querySelector('.stat-card:nth-child(2) p');
+  const countCard = statsContainer.querySelector('.stat-card:nth-child(3) p');
+  const bestPerformerCard = statsContainer.querySelector('.stat-card:nth-child(4) p');
+
+  if (valueCard) {
+       valueCard.textContent = `$${totalPurchaseValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+       valueCard.previousElementSibling.textContent = "Total Purchase Value";
+  }
+   if (returnCard) {
+      returnCard.textContent = "N/A"; 
+   }
+   if (countCard) {
+      countCard.textContent = `${numStocks} (${uniqueTickers} unique)`;
+   }
+   if (bestPerformerCard) {
+      bestPerformerCard.textContent = "N/A";
+   }
+}
