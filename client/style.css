@@ -69,6 +69,14 @@ body {
     border-radius: 0.25rem;
 }
 
+.form-error {
+    color: red
+}
+
+.quantity-purchaseprice{
+    display: flex;
+}
+
 .btn {
     background-color: var(--primary);
     color: white;
