@@ -1,4 +1,5 @@
 import stocks from 'stock-ticker-symbol';
+import { addStockTransaction } from '../db/stockTransactions';
 
 let portfolioInput = document.getElementsByClassName("portfolio-input")[0];
 portfolioInput.innerHTML = `
@@ -55,7 +56,7 @@ let formValidation = (ticker, purchaseDate, quantity, totalPrice) => {
     else if (totalPrice && totalPrice < 0) formErrorElements[2].innerHTML = "Invalid Price Inputted"
     else formErrorElements[2].innerHTML = ""
 
-    return Array(formErrorElements).every((e) => e.innerHTML==="")
+    return [...formErrorElements].every(e => e.innerHTML === "");
 }
 
 let grabbingFormInputs = () => {
@@ -71,12 +72,12 @@ buySellStockForm.addEventListener('submit', (e) => {
     e.preventDefault(); // Prevent Page Reload
 
     let [ticker, purchaseDate, quantity, totalPrice] = grabbingFormInputs();
+    let buyFlag = e.submitter.id === "buy-button" ? true : false;
     if (!formValidation(ticker, purchaseDate, quantity, totalPrice)) return 
 
-    const submitter = e.submitter; // <-- This is the button that triggered the submit
-    if (submitter.id === "buy-button") {
-        console.log("buy");
-    } else if (submitter.id === "sell-button") {
-        console.log("sell");
+    if (buyFlag) {
+        console.log("buy")
+        addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag)
     }
+    else console.log("sell")
 });
