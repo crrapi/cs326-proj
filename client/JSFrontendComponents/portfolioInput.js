@@ -54,7 +54,10 @@ let formValidation = (ticker, purchaseDate, quantity, totalPrice) => {
     else if (quantity && quantity < 0) formErrorElements[2].innerHTML = "Invalid Quantity Inputted"
     else if (totalPrice && totalPrice < 0) formErrorElements[2].innerHTML = "Invalid Price Inputted"
     else formErrorElements[2].innerHTML = ""
+
+    return Array(formErrorElements).every((e) => e.innerHTML==="")
 }
+
 let grabbingFormInputs = () => {
     let ticker = document.getElementById("ticker").value
     let purchaseDate = document.getElementById("purchase-date").value
@@ -68,7 +71,7 @@ buySellStockForm.addEventListener('submit', (e) => {
     e.preventDefault(); // Prevent Page Reload
 
     let [ticker, purchaseDate, quantity, totalPrice] = grabbingFormInputs();
-    formValidation(ticker, purchaseDate, quantity, totalPrice)
+    if (!formValidation(ticker, purchaseDate, quantity, totalPrice)) return 
 
     const submitter = e.submitter; // <-- This is the button that triggered the submit
     if (submitter.id === "buy-button") {
