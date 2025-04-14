@@ -92,10 +92,6 @@ buySellStockFormElement.addEventListener('submit', (e) => {
     //The do grab form inputs
     let [ticker, purchaseDate, quantity, totalPrice, buyFlag] = grabbingFormInputs(e);
 
-
-    if (buyFlag) {
-        console.log("buy")
-        // addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag)
-    }
-    else console.log("sell")
+    //Add to DB
+    addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag)
 });
