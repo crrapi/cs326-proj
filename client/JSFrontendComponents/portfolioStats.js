@@ -1,4 +1,4 @@
-import { getTotalPortfolioValue } from '../db/stockTransactions';
+import { getTotalPortfolioValue, getTotalPortfolioStocksQuantity} from '../db/stockTransactions';
 
 let portfolioStats = document.getElementsByClassName("portfolio-stats")[0]
 portfolioStats.innerHTML = `
@@ -9,32 +9,39 @@ portfolioStats.innerHTML = `
 
     <div class="stat-card">
         <h3>Number of Stocks</h3>
-        <p>8</p>
+        <p id = total-portfolio-stocks-quantity-holdings>8</p>
     </div>
     <div class="stat-card">
 
 `
 export let updateStatsCard = () => {
     updateTotalValueStatsCard();
-
+    updateTotalStocksQuantityStatsCard();
 }
 
 
 
 
-let totalPortFolioValueHoldingsStatsCard = document.getElementById("total-portfolio-value-holdings");
-let updateTotalValueStatsCard =  () => {
-    console.log("HELLO");
-
+let totalPortfolioValueHoldingsStatsCard = document.getElementById("total-portfolio-value-holdings");
+let updateTotalValueStatsCard = () => {
     getTotalPortfolioValue()
-        .then((totalValue) => {
-            console.log(totalValue)
-            totalPortFolioValueHoldingsStatsCard.innerHTML = `$${totalValue.toFixed(2)}`;
-        })
+        .then((totalValue) => {totalPortfolioValueHoldingsStatsCard.innerHTML = `$${totalValue.toFixed(2)}`;})
         .catch((err) => {
+            totalPortfolioValueHoldingsStatsCard.innerHTML = "Failed to update total value stats card"
             console.error("Failed to update total value stats card", err);
         });
 };
+
+let totalPortfolioStocksQuantityHoldings = document.getElementById("total-portfolio-stocks-quantity-holdings");
+let updateTotalStocksQuantityStatsCard = () => {
+    console.log("testing")
+    getTotalPortfolioStocksQuantity()
+        .then((totalValue) => {totalPortfolioStocksQuantityHoldings.innerHTML = totalValue;})
+        .catch((err) => {
+            totalPortfolioStocksQuantityHoldings.innerHTML = "Failed to update total value stats card"
+            console.error("Failed to update total value stats card", err);
+        });
+}
 
 updateStatsCard(); //Needs to start once at the beginning of the program
 

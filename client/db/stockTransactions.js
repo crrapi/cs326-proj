@@ -72,3 +72,31 @@ export async function getTotalPortfolioValue() {
         };
     });
 }
+
+//Gets how much many stocks your portfolio has in total
+export async function getTotalPortfolioStocksQuantity() {
+    const db = await dbPromise;
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction("transactions", "readonly");
+        const store = transaction.objectStore("transactions");
+
+        const request = store.getAll();
+
+        request.onsuccess = () => {
+            const allTransactions = request.result;
+            let netQuantityStocks = 0;
+
+            for (const tx of allTransactions) {
+                if (tx.buyFlag) netQuantityStocks += Number(tx.quantity);
+                else netQuantityStocks -= Number(tx.quantity);
+            }
+            resolve(netQuantityStocks);
+        };
+
+        request.onerror = (event) => {
+            console.error("Error reading holdings", event);
+            reject(event);
+        };
+    });
+}
