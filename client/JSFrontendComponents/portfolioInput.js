@@ -1,5 +1,6 @@
 import stocks from 'stock-ticker-symbol';
 import { addStockTransaction } from '../db/stockTransactions';
+import { updateStatsCard } from './portfolioStats'
 
 let portfolioInput = document.getElementsByClassName("portfolio-input")[0];
 portfolioInput.innerHTML = `
@@ -94,4 +95,7 @@ buySellStockFormElement.addEventListener('submit', (e) => {
 
     //Add to DB
     addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag)
+
+    //Update Screen
+    updateStatsCard();
 });

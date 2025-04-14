@@ -1,5 +1,6 @@
 import { dbPromise } from "./indexedDBSetup";
 
+//Adds stock transaction to DB
 export async function addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag) {
     const db = await dbPromise;
 
@@ -14,6 +15,7 @@ export async function addStockTransaction(ticker, purchaseDate, quantity, totalP
     request.onerror = (event) => console.error("Failed to add transaction", event);
 }
 
+//Gets how many of a current stock you have own
 export async function getCurrentHolding(ticker) {
     const db = await dbPromise;
 
@@ -34,6 +36,34 @@ export async function getCurrentHolding(ticker) {
             }
 
             resolve(netQuantity);
+        };
+
+        request.onerror = (event) => {
+            console.error("Error reading holdings", event);
+            reject(event);
+        };
+    });
+}
+
+//Gets how much money your portfolio has in total
+export async function getTotalPortfolioValue() {
+    const db = await dbPromise;
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction("transactions", "readonly");
+        const store = transaction.objectStore("transactions");
+
+        const request = store.getAll();
+
+        request.onsuccess = () => {
+            const allTransactions = request.result;
+            let netValue = 0;
+
+            for (const tx of allTransactions) {
+                if (tx.buyFlag) netValue += tx.totalPrice;
+                else netValue -= tx.totalPrice;
+            }
+            resolve(netValue);
         };
 
         request.onerror = (event) => {
