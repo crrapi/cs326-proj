@@ -37,19 +37,26 @@ portfolioInput.innerHTML = `
 `;
 
 
-let buySellStockForm = document.getElementsByClassName("buy-sell-stock-form")[0];
-let formValidation = (ticker, purchaseDate, quantity, totalPrice) => {
-    let formErrorElements = document.getElementsByClassName("form-error")
-    
-    if (!ticker) formErrorElements[0].innerHTML = "No Stock Ticker Symbol Inputted"
-    else if (!stocks.lookup(ticker)) formErrorElements[0].innerHTML = "Invalid Stock Ticker Symbol"
+let buySellStockFormElement = document.getElementsByClassName("buy-sell-stock-form")[0];
+let formErrorElements = document.getElementsByClassName("form-error")
+let tickerFormElement = document.getElementById("ticker")
+let purchaseDateFormElement = document.getElementById("purchase-date")
+let quantityFormElement = document.getElementById("quantity")
+let totalPriceFormElement = document.getElementById("total-price")
+
+let formValidation = () => {
+    let tickerSymbol = tickerFormElement.value;
+    if (!tickerSymbol) formErrorElements[0].innerHTML = "No Stock Ticker Symbol Inputted";
+    else if (!stocks.lookup(tickerSymbol)) formErrorElements[0].innerHTML = "Invalid Stock Ticker Symbol"
     else formErrorElements[0].innerHTML = ""
     
+    let purchaseDate = purchaseDateFormElement.value;
     if (!purchaseDate) formErrorElements[1].innerHTML = "No Purchase date Inputted"
     else if (purchaseDate > (new Date()).toISOString().split('T')[0]) formErrorElements[1].innerHTML = "Invalid Date Inputted"
     else formErrorElements[1].innerHTML = ""
 
-    
+    let quantity = quantityFormElement.value;
+    let totalPrice = totalPriceFormElement.value;
     if (!quantity && !totalPrice) formErrorElements[2].innerHTML = "No quantity or total price"
     else if (quantity && totalPrice) formErrorElements[2].innerHTML = "Can't have quantity and total price"
     else if (quantity && quantity < 0) formErrorElements[2].innerHTML = "Invalid Quantity Inputted"
@@ -59,25 +66,36 @@ let formValidation = (ticker, purchaseDate, quantity, totalPrice) => {
     return [...formErrorElements].every(e => e.innerHTML === "");
 }
 
-let grabbingFormInputs = () => {
+let grabbingFormInputs = (e) => {
     let ticker = document.getElementById("ticker").value
     let purchaseDate = document.getElementById("purchase-date").value
     let quantity = document.getElementById("quantity").value
     let totalPrice = document.getElementById("total-price").value
-    return [ticker, purchaseDate, quantity, totalPrice]
+    let buyFlag = e.submitter.id === "buy-button" ? true : false;
+
+    let currentStockPrice = 100; //Change this later
+    if (quantity) totalPrice = currentStockPrice*quantity;
+    else quantity = totalPrice / currentStockPrice;
+
+
+    return [ticker, purchaseDate, quantity, totalPrice, buyFlag]
 }
 
 
-buySellStockForm.addEventListener('submit', (e) => {
+
+buySellStockFormElement.addEventListener('submit', (e) => {
     e.preventDefault(); // Prevent Page Reload
 
-    let [ticker, purchaseDate, quantity, totalPrice] = grabbingFormInputs();
-    let buyFlag = e.submitter.id === "buy-button" ? true : false;
-    if (!formValidation(ticker, purchaseDate, quantity, totalPrice)) return 
+    //Do form Validation first
+    if (!formValidation()) return 
+
+    //The do grab form inputs
+    let [ticker, purchaseDate, quantity, totalPrice, buyFlag] = grabbingFormInputs(e);
+
 
     if (buyFlag) {
         console.log("buy")
-        addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag)
+        // addStockTransaction(ticker, purchaseDate, quantity, totalPrice, buyFlag)
     }
     else console.log("sell")
 });
