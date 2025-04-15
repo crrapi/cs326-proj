@@ -227,7 +227,9 @@ class PortfolioService {
     // Private helper methods
     _loadData() {
         const data = localStorage.getItem(this.STORAGE_KEY);
-        return data ? JSON.parse(data) : null;
+        return data ? JSON.parse(data) : {
+            users: {}
+        };
     }
 
     _saveData(data) {
