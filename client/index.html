@@ -1,31 +1,19 @@
+<!-- This will be the login page -->    
+<!-- It's named index.html because vite needs an entry point for the build tool to work -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Portfolio Visualizer</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>Login</title>
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-    <header class="header"></header>
+  <header class="header"></header>
 
-    <main class="container">
-        <div class="main-content">
-            <section class="portfolio-input"></section>
+  <div class="login-signup"></div>
 
+  <script type="module" src="./JSFrontendComponents//header.js"></script>
+  <script type="module" src="./JSFrontendComponents//loginsignup.js"></script>
 
-            <section class="visualization">
-                <h2>Portfolio Visualization</h2>
-                <div class="canvas-placeholder"></div>
-
-                
-                <div class="portfolio-stats"></div>
-            </section>
-        </div>
-    </main>
-    <script type="module" src="./index.js"></script>
-    <script type="module" src="./JSFrontendComponents//header.js"></script>
-    <script type="module" src="./JSFrontendComponents/portfolioStats.js"></script>
-    <script type="module" src="./JSFrontendComponents/portfolioInput.js"></script>
 </body>
 </html>
