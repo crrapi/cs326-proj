@@ -7,68 +7,25 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <h1>Stock Portfolio Visualizer</h1>
-        </div>
-    </header>
+    <header class="header"></header>
 
     <main class="container">
         <div class="main-content">
-            <aside class="portfolio-input">
-                <h2>Add Stock</h2>
-                <form>
-                    <div class="form-group">
-                        <label for="ticker">Ticker Symbol</label>
-                        <input type="text" id="ticker" placeholder="e.g., AAPL">
-                        <!-- TODO autocomplete / debounced lookup -->
-                    </div>
-                    <div class="form-group">
-                        <label for="quantity">Quantity</label>
-                        <input type="number" id="quantity" placeholder="Number of shares">
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-date">Purchase Date</label>
-                        <input type="date" id="purchase-date">
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-price">Purchase Price</label>
-                        <input type="number" id="purchase-price" placeholder="Price per share">
-                    </div>
-                    <button type="submit" class="btn">Add to Portfolio</button>
-                    <!-- TODO onSubmit add to local storage, or hit backend API -->
-                </form>
-            </aside>
+            <section class="portfolio-input"></section>
+
 
             <section class="visualization">
                 <h2>Portfolio Visualization</h2>
                 <div class="canvas-placeholder"></div>
 
                 
-                <div class="portfolio-stats">
-
-                    <!-- EXAMPLE FOR NOW, calculate later -->
-
-                    <div class="stat-card">
-                        <h3>Total Value</h3>
-                        <p>$45,678.90</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Total Return</h3>
-                        <p>+15.4%</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Number of Stocks</h3>
-                        <p>8</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Best Performer</h3>
-                        <p>AAPL +25%</p>
-                    </div>
-                </div>
+                <div class="portfolio-stats"></div>
             </section>
         </div>
     </main>
-    <script type="module" src="/index.js"></script>
+    <script type="module" src="./index.js"></script>
+    <script type="module" src="./JSFrontendComponents//header.js"></script>
+    <script type="module" src="./JSFrontendComponents/portfolioStats.js"></script>
+    <script type="module" src="./JSFrontendComponents/portfolioInput.js"></script>
 </body>
 </html>
