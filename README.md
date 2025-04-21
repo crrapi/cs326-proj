@@ -14,14 +14,11 @@ Our Stock Portfolio Visualizer creates a more intuitive way to visualize stock p
 
 ### Key Features
 
-- **Portfolio Input**: Users can input their stock purchases (ticker symbol, quantity, purchase date, and price).
-- **Dynamic Content Updates**: The portfolio list and visualizations dynamically update as users add, edit, or delete stocks.
-- **Form Validation**: Real-time validation for stock input forms, including ticker symbol, quantity, purchase date, and price.
-- **Multi-View Navigation**: Seamless navigation between different views (e.g., portfolio visualization, stock details, settings) without page reloads.
-- **Persistent Storage**: Saves portfolio information in IndexedDB for easy access and data persistence across sessions.
-- **Asynchronous Data Handling**: Fetches mock stock data (e.g., historical prices) from a local JSON file to simulate API integration.
-- **Intuitive Visualization**: Uses p5.js to create color-coded, layered visualizations that show how each stock contributes to overall portfolio performance.
-- **Performance Metrics**: Displays key portfolio statistics and metrics to complement the visual representation.
+- Portfolio Input: Users can input their stock purchases (ticker symbol, quantity, purchase date, and price)
+- Data Integration: Connects to stock APIs to fetch current and historical price data
+- Persistent Storage: Saves portfolio information in a database for easy access
+- Intuitive Visualization: Uses p5.js to create color-coded, layered visualizations that show how each stock contributes to overall portfolio performance
+- Performance Metrics: Displays key portfolio statistics and metrics to complement the visual representation
 
 ### Why This Project?
 
@@ -60,30 +57,13 @@ Role: Frontend Developer & API Routes Implementer
 
 ### New Features Implemented
 
-- **Dynamic Content Updates**: Portfolio list and visualizations dynamically update without page reloads.
-- **Form Validation**: Real-time validation for stock input forms with user feedback for errors.
-- **Multi-View Navigation**: Implemented JavaScript-based navigation for seamless transitions between views.
-- **Persistent Storage**: Integrated IndexedDB for storing portfolio data and user preferences.
-- **Asynchronous Data Handling**: Fetches mock stock data from a local JSON file to simulate API integration.
+<https://link.excalidraw.com/l/81G1x30cW02/79UafFrxW9H>
 
-### Updated Problem/Solution Alignment
+# Database Designs
 
-The features implemented in this milestone directly address the problem of complex and unintuitive stock visualization tools by providing:
+The database designs can also be found at the excalidraw document, in a visual fashion.
 
-- Real-time updates to portfolio data and visualizations.
-- Persistent storage for user data, ensuring a seamless experience across sessions.
-- A multi-view interface for better organization and navigation.
+# Milestone Slideshow
 
-### Team Member Updates
-
-- No changes to team members or roles.
-
-## UI Designs
-
-All our UI designs can be found at the following Excalidraw document:
-
-[UI Designs](https://link.excalidraw.com/l/81G1x30cW02/79UafFrxW9H)
-
-## Database Designs
-
-The database designs can also be found at the Excalidraw document, in a visual fashion.
+The milestone slideshow can be found at the following link:
+<https://docs.google.com/presentation/d/1GOd9pnTrJfTdgM6ZditK6_5sNPNnutc8gc6HppMPSUE/edit?slide=id.p#slide=id.p>
