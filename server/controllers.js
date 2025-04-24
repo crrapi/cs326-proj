@@ -1,5 +1,6 @@
 const storage = require('./storage');
 const fetch = require('node-fetch');
+const { v4: uuidv4 } = require('uuid');
 
 const FMP_API_KEY = process.env.FMP_API_KEY || "ydVoHu8hsFyCf0vukGtKVgDuJzCfWkRc";
 const FMP_API_BASE_URL = "https://financialmodelingprep.com/api/v3";
@@ -28,7 +29,7 @@ async function fetchHistoricalData(symbol) {
             let errorBody = null;
             try {
                 errorBody = await response.json();
-            } catch (e) { /* ignore json parsing error */ }
+            } catch (e) { }
 
             const errorMessage = errorBody?.["Error Message"] || `HTTP error! status: ${response.status}`;
 
@@ -50,7 +51,7 @@ async function fetchHistoricalData(symbol) {
             return [];
         }
         console.log(`Successfully fetched FMP data for ${symbol}. ${data.historical.length} records.`);
-        return data.historical;
+        return data.historical.sort((a, b) => new Date(a.date) - new Date(b.date));
     } catch (error) {
         console.error(`Failed to fetch historical data for ${symbol}:`, error);
         throw error;
@@ -61,11 +62,15 @@ async function getPortfolio(req, res, next) {
     const username = 'defaultUser';
     try {
         const data = await storage.readData();
-        if (!data[username] || !data[username].holdings) {
-            console.log(`No data found for user ${username}, returning empty holdings.`);
-            return res.json([]);
+        if (!data[username]) {
+            console.log(`User ${username} not found, returning default structure.`);
+             res.json({ holdings: [], cashWithdrawnFromSales: 0 });
+        } else {
+            res.json({
+                holdings: data[username].holdings || [],
+                cashWithdrawnFromSales: data[username].cashWithdrawnFromSales || 0
+            });
         }
-        res.json(data[username].holdings);
     } catch (error) {
         console.error("Error fetching portfolio:", error);
         next(error);
@@ -88,39 +93,48 @@ async function buyStock(req, res, next) {
     if (!purchaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) {
         return res.status(400).json({ message: "Invalid or missing purchase date. Required format: YYYY-MM-DD." });
     }
+     const purchaseDt = new Date(purchaseDate + 'T00:00:00');
+     if (isNaN(purchaseDt.getTime())) {
+        return res.status(400).json({ message: "Invalid purchase date." });
+     }
 
-    const upperSymbol = symbol.toUpperCase();
+
+    const upperSymbol = symbol.trim().toUpperCase();
 
     try {
         const data = await storage.readData();
         if (!data[username]) {
-            data[username] = { holdings: [] };
+            data[username] = { holdings: [], cashWithdrawnFromSales: 0 };
         }
         if (!data[username].holdings) {
             data[username].holdings = [];
         }
+         if (typeof data[username].cashWithdrawnFromSales !== 'number') {
+            data[username].cashWithdrawnFromSales = 0;
+         }
 
-        const holdings = data[username].holdings;
-        const existingHoldingIndex = holdings.findIndex(h => h.symbol === upperSymbol);
+        const newHoldingEntry = {
+            entryId: uuidv4(),
+            symbol: upperSymbol,
+            quantity: quantity,
+            purchaseDate: purchaseDate,
+            purchasePrice: purchasePrice,
+        };
 
-        if (existingHoldingIndex > -1) {
-            const existing = holdings[existingHoldingIndex];
-            const currentTotalValue = existing.averagePurchasePrice * existing.quantity;
-            const purchaseValue = purchasePrice * quantity;
-            existing.quantity += quantity;
-            existing.averagePurchasePrice = (currentTotalValue + purchaseValue) / existing.quantity;
-            console.log(`Updated holding for ${upperSymbol}. New quantity: ${existing.quantity}, New Avg Price: ${existing.averagePurchasePrice}`);
-        } else {
-            holdings.push({
-                symbol: upperSymbol,
-                quantity: quantity,
-                averagePurchasePrice: purchasePrice
-            });
-            console.log(`Added new holding for ${upperSymbol}. Quantity: ${quantity}, Avg Price: ${purchasePrice}`);
-        }
+        data[username].holdings.push(newHoldingEntry);
+        console.log(`Added new holding entry for ${upperSymbol}. Entry ID: ${newHoldingEntry.entryId}, Quantity: ${quantity}, Price: ${purchasePrice}, Date: ${purchaseDate}`);
+
+        data[username].holdings.sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
 
         await storage.writeData(data);
-        res.status(201).json({ message: `Successfully bought ${quantity} shares of ${upperSymbol}`, holdings: data[username].holdings });
+        res.status(201).json({
+            message: `Successfully bought ${quantity} shares of ${upperSymbol}`,
+            entry: newHoldingEntry,
+            userData: {
+                 holdings: data[username].holdings,
+                 cashWithdrawnFromSales: data[username].cashWithdrawnFromSales
+            }
+        });
     } catch (error) {
         console.error("Error buying stock:", error);
         next(error);
@@ -129,16 +143,27 @@ async function buyStock(req, res, next) {
 
 async function sellStock(req, res, next) {
     const username = 'defaultUser';
-    const { symbol, quantity } = req.body;
+    const { symbol, quantity, sellPrice, sellDate } = req.body;
 
     if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
         return res.status(400).json({ message: "Invalid or missing stock symbol." });
     }
     if (quantity === undefined || typeof quantity !== 'number' || quantity <= 0) {
-        return res.status(400).json({ message: "Invalid or missing quantity. Must be a positive number." });
+        return res.status(400).json({ message: "Invalid or missing quantity to sell. Must be a positive number." });
     }
+    if (sellPrice === undefined || typeof sellPrice !== 'number' || sellPrice < 0) {
+        return res.status(400).json({ message: "Invalid or missing sell price. Must be a non-negative number." });
+    }
+    if (!sellDate || !/^\d{4}-\d{2}-\d{2}$/.test(sellDate)) {
+        return res.status(400).json({ message: "Invalid or missing sell date. Required format: YYYY-MM-DD." });
+    }
+     const sellDt = new Date(sellDate + 'T00:00:00');
+     if (isNaN(sellDt.getTime())) {
+        return res.status(400).json({ message: "Invalid sell date." });
+     }
 
-    const upperSymbol = symbol.toUpperCase();
+    const upperSymbol = symbol.trim().toUpperCase();
+    let quantityToSell = quantity;
 
     try {
         const data = await storage.readData();
@@ -147,28 +172,68 @@ async function sellStock(req, res, next) {
         }
 
         const holdings = data[username].holdings;
-        const existingHoldingIndex = holdings.findIndex(h => h.symbol === upperSymbol);
-
-        if (existingHoldingIndex > -1) {
-            const existing = holdings[existingHoldingIndex];
-            if (existing.quantity < quantity) {
-                return res.status(400).json({ message: `Not enough shares to sell. You have ${existing.quantity} ${upperSymbol}, tried to sell ${quantity}.` });
-            }
-
-            existing.quantity -= quantity;
-            console.log(`Sold ${quantity} shares of ${upperSymbol}. Remaining quantity: ${existing.quantity}`);
-
-            if (existing.quantity < 0.000001) {
-                holdings.splice(existingHoldingIndex, 1);
-                console.log(`Removed holding for ${upperSymbol} as quantity reached zero.`);
-            }
-
-            await storage.writeData(data);
-            res.status(200).json({ message: `Successfully sold ${quantity} shares of ${upperSymbol}`, holdings: data[username].holdings });
-
-        } else {
-            return res.status(404).json({ message: `Stock ${upperSymbol} not found in portfolio.` });
+        if (typeof data[username].cashWithdrawnFromSales !== 'number') {
+             data[username].cashWithdrawnFromSales = 0;
         }
+
+        const relevantEntries = holdings
+            .filter(h => h.symbol === upperSymbol && (h.soldQuantity || 0) < h.quantity)
+            .sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
+
+        const totalAvailableQuantity = relevantEntries.reduce((sum, entry) => {
+            const availableInEntry = entry.quantity - (entry.soldQuantity || 0);
+            return sum + availableInEntry;
+        }, 0);
+
+        if (totalAvailableQuantity < quantityToSell) {
+            return res.status(400).json({
+                message: `Not enough shares to sell. You have ${totalAvailableQuantity.toFixed(6)} available ${upperSymbol}, tried to sell ${quantityToSell}.`
+            });
+        }
+
+        let totalCashFromThisSale = 0;
+        let sharesSoldInThisTx = 0;
+
+        for (const entry of relevantEntries) {
+            if (quantityToSell <= 0) break;
+
+             const purchaseDt = new Date(entry.purchaseDate + 'T00:00:00');
+             if (sellDt < purchaseDt) {
+                 console.warn(`Skipping entry ${entry.entryId} for sell date ${sellDate} as it was purchased later on ${entry.purchaseDate}`);
+                 // Continue to next entry if this one wasn't purchased yet
+                 continue;
+             }
+
+            const availableInEntry = entry.quantity - (entry.soldQuantity || 0);
+            const sellFromThisEntry = Math.min(quantityToSell, availableInEntry);
+
+            if (sellFromThisEntry > 0) {
+                entry.sellDate = sellDate;
+                entry.sellPrice = sellPrice;
+                entry.soldQuantity = (entry.soldQuantity || 0) + sellFromThisEntry;
+
+                quantityToSell -= sellFromThisEntry;
+                sharesSoldInThisTx += sellFromThisEntry;
+                totalCashFromThisSale += sellFromThisEntry * sellPrice;
+
+                console.log(`Sold ${sellFromThisEntry.toFixed(6)} shares from entry ${entry.entryId} (purchased ${entry.purchaseDate}). Remaining in entry: ${(entry.quantity - entry.soldQuantity).toFixed(6)}`);
+            }
+        }
+
+        data[username].cashWithdrawnFromSales += totalCashFromThisSale;
+
+        console.log(`Total sold in this transaction: ${sharesSoldInThisTx.toFixed(6)} shares of ${upperSymbol} for $${totalCashFromThisSale.toFixed(2)}.`);
+        console.log(`Total cash withdrawn from all sales: $${data[username].cashWithdrawnFromSales.toFixed(2)}`);
+
+        await storage.writeData(data);
+        res.status(200).json({
+            message: `Successfully sold ${sharesSoldInThisTx.toFixed(6)} shares of ${upperSymbol}`,
+             userData: {
+                 holdings: data[username].holdings,
+                 cashWithdrawnFromSales: data[username].cashWithdrawnFromSales
+             }
+        });
+
     } catch (error) {
         console.error("Error selling stock:", error);
         next(error);
@@ -179,26 +244,39 @@ async function getRealtimeGraphData(req, res, next) {
     const username = 'defaultUser';
     try {
         const data = await storage.readData();
-        if (!data[username] || !data[username].holdings || data[username].holdings.length === 0) {
+        const userData = data[username];
+
+        if (!userData || !userData.holdings || userData.holdings.length === 0) {
             console.log(`No holdings found for user ${username}, returning empty graph data.`);
             return res.json([]);
         }
 
-        const currentHoldings = data[username].holdings;
-        const symbols = currentHoldings.map(h => h.symbol);
+        // --- Find the earliest purchase date ---
+        let earliestPurchaseDate = null;
+        if (userData.holdings.length > 0) {
+            earliestPurchaseDate = userData.holdings.reduce((earliest, current) => {
+                const currentDt = new Date(current.purchaseDate + 'T00:00:00');
+                return earliest === null || currentDt < earliest ? currentDt : earliest;
+            }, null);
+        }
+        console.log("Earliest purchase date found:", earliestPurchaseDate?.toISOString().split('T')[0] || "N/A");
+        // --- End Find earliest purchase date ---
 
-        console.log(`Generating graph data for symbols: ${symbols.join(', ')}`);
+
+        const allSymbols = [...new Set(userData.holdings.map(h => h.symbol))];
+
+        console.log(`Generating graph data for symbols: ${allSymbols.join(', ')}`);
 
         const apiResults = await Promise.allSettled(
-            symbols.map(symbol => fetchHistoricalData(symbol))
+            allSymbols.map(symbol => fetchHistoricalData(symbol))
         );
 
         const successfulFetches = {};
         let fetchErrors = [];
         apiResults.forEach((result, index) => {
-            const symbol = symbols[index];
+            const symbol = allSymbols[index];
             if (result.status === 'fulfilled' && Array.isArray(result.value)) {
-                successfulFetches[symbol] = result.value.sort((a, b) => new Date(a.date) - new Date(b.date));
+                successfulFetches[symbol] = result.value;
             } else {
                 console.error(`Failed to fetch or process data for ${symbol}:`, result.reason || 'Unknown error');
                 fetchErrors.push(`Failed for ${symbol}: ${result.reason?.message || 'Unknown error'}`);
@@ -206,7 +284,7 @@ async function getRealtimeGraphData(req, res, next) {
         });
 
         if (fetchErrors.length > 0) {
-            console.warn("Partial data generated due to fetch errors:", fetchErrors);
+            console.warn("Partial data generation possible due to fetch errors:", fetchErrors);
         }
 
         if (Object.keys(successfulFetches).length === 0) {
@@ -214,16 +292,28 @@ async function getRealtimeGraphData(req, res, next) {
             return res.json([]);
         }
 
-        const firstSymbol = Object.keys(successfulFetches)[0];
-        const allDates = successfulFetches[firstSymbol].map(h => h.date);
+        let allDates = new Set();
+        Object.values(successfulFetches).forEach(history => {
+            history.forEach(dayData => allDates.add(dayData.date));
+        });
 
-        if (!allDates || allDates.length === 0) {
-            console.log("No historical dates found after fetching, returning empty graph data.");
+        let sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+
+        // --- Filter dates based on earliest purchase ---
+        if (earliestPurchaseDate) {
+            const earliestPurchaseDateStr = earliestPurchaseDate.toISOString().split('T')[0];
+            sortedDates = sortedDates.filter(dateStr => dateStr >= earliestPurchaseDateStr);
+            console.log(`Filtered dates to start from ${earliestPurchaseDateStr}. ${sortedDates.length} dates remaining.`);
+        }
+        // --- End Filter dates ---
+
+        if (!sortedDates || sortedDates.length === 0) {
+            console.log("No historical dates remaining after filtering, returning empty graph data.");
             return res.json([]);
         }
 
         const priceMap = {};
-        allDates.forEach(date => {
+        sortedDates.forEach(date => {
             priceMap[date] = {};
         });
 
@@ -235,27 +325,57 @@ async function getRealtimeGraphData(req, res, next) {
             });
         });
 
-        const graphData = allDates.map(dateStr => {
-            const stocksForDate = [];
-            currentHoldings.forEach(holding => {
-                const price = priceMap[dateStr]?.[holding.symbol];
-                if (price !== undefined && holding.quantity > 0) {
-                    stocksForDate.push({
-                        symbol: holding.symbol,
-                        price: price,
-                        shares: holding.quantity,
-                        color: getStockColor(holding.symbol)
-                    });
+        const graphData = sortedDates.map(dateStr => {
+            const currentDt = new Date(dateStr + 'T00:00:00');
+            const activeHoldingsBySymbol = {};
+
+            userData.holdings.forEach(entry => {
+                const purchaseDt = new Date(entry.purchaseDate + 'T00:00:00');
+                const sellDt = entry.sellDate ? new Date(entry.sellDate + 'T00:00:00') : null;
+
+                let sharesHeldFromEntry = 0;
+                if (purchaseDt <= currentDt) {
+                   const effectivelySoldQuantity = (sellDt && sellDt <= currentDt) ? (entry.soldQuantity || 0) : 0;
+                   sharesHeldFromEntry = entry.quantity - effectivelySoldQuantity;
+                }
+                const activeQuantityInEntry = sharesHeldFromEntry;
+
+
+                if (activeQuantityInEntry > 1e-9) {
+                    if (!activeHoldingsBySymbol[entry.symbol]) {
+                        activeHoldingsBySymbol[entry.symbol] = 0;
+                    }
+                    activeHoldingsBySymbol[entry.symbol] += activeQuantityInEntry;
                 }
             });
 
+            const stocksForDate = [];
+            Object.entries(activeHoldingsBySymbol).forEach(([symbol, totalActiveShares]) => {
+                 const price = priceMap[dateStr]?.[symbol];
+
+                 if (price !== undefined && totalActiveShares > 1e-9) {
+                    stocksForDate.push({
+                        symbol: symbol,
+                        price: price,
+                        shares: totalActiveShares,
+                        color: getStockColor(symbol)
+                    });
+                 } else if (totalActiveShares > 1e-9) {
+                      console.warn(`Missing price for ${symbol} on ${dateStr}. Stock value for this date will be incomplete.`);
+                 }
+            });
+
+            const totalValue = stocksForDate.reduce((sum, stock) => sum + (stock.price * stock.shares), 0);
+
             return {
                 date: dateStr,
-                stocks: stocksForDate
+                stocks: stocksForDate,
+                totalValue: totalValue
             };
         });
 
-        console.log(`Generated graph data with ${graphData.length} date points.`);
+        console.log(`Generated graph data with ${graphData.length} date points (after filtering).`);
+
         res.json(graphData);
 
     } catch (error) {
@@ -263,6 +383,7 @@ async function getRealtimeGraphData(req, res, next) {
         next(error);
     }
 }
+
 
 module.exports = {
     getPortfolio,
