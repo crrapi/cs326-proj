@@ -3,7 +3,11 @@ const controllers = require('./controllers');
 
 const router = express.Router();
 
-router.get('/', controllers.getRootHandler);
-router.get('/hello', controllers.getHelloHandler);
+
+router.get('/portfolio', controllers.getPortfolio);
+router.post('/portfolio/buy', controllers.buyStock);
+router.post('/portfolio/sell', controllers.sellStock);
+router.get('/portfolio/historical', controllers.getPortfolioHistoricalData);
+
 
 module.exports = router;

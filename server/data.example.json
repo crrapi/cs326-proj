@@ -1,0 +1,11 @@
+{
+  "defaultUser": {
+    "holdings": [
+      {
+        "symbol": "AAPL",
+        "quantity": 2.000001,
+        "averagePurchasePrice": 100
+      }
+    ]
+  }
+}

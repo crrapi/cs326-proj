@@ -1,34 +1,204 @@
-let portfolioInput = document.getElementsByClassName("portfolio-input")[0];
-portfolioInput.innerHTML = `
-    <h2>Buy/Sell Stock</h2>
-    <form class="buy-sell-stock-form">
-        <div class="form-group">
-            <label for="ticker">Ticker Symbol</label>
-            <input type="text" id="ticker" placeholder="e.g., AAPL">
-            <div class="form-error"></div>
-        </div>
-        <div class="form-group">
-            <label for="purchase-date">Purchase Date</label>
-            <input type="date" id="purchase-date">
-            <div class="form-error"></div>
-        </div>
-        <div class="form-group">
-            <div class="quantity-purchaseprice">
-                <div>
-                    <label for="quantity">Quantity</label>
-                    <input type="number" id="quantity" placeholder="# of shares">
-                </div>
-                <div>
-                    <label for="total-price">Total Price</label>
-                    <input type="number" id="total-price" placeholder="Total Price">
-                </div>
+const portfolioInputElement = document.querySelector(".portfolio-input"); 
+if (portfolioInputElement) {
+    portfolioInputElement.innerHTML = `
+        <h2>Manage Portfolio</h2>
+        <form class="buy-sell-stock-form">
+            <div class="form-group">
+                <label for="ticker">Ticker Symbol</label>
+                <input type="text" id="ticker" name="ticker" placeholder="e.g., AAPL" required>
+                <div class="form-error" id="ticker-error"></div>
             </div>
-            <div class="form-error"></div>
-        </div>
-        <div class="form-group">
+            <!-- Purchase date is not directly used in the simplified backend state, but kept for potential future use -->
+            <!-- <div class="form-group">
+                <label for="purchase-date">Date (Optional)</label>
+                <input type="date" id="purchase-date" name="purchaseDate">
+                <div class="form-error" id="date-error"></div>
+            </div> -->
+            <div class="form-group">
+                <label for="quantity">Quantity</label>
+                <input type="number" id="quantity" name="quantity" placeholder="# of shares" required min="0.000001" step="any">
+                 <div class="form-error" id="quantity-error"></div>
+            </div>
+             <div class="form-group" id="price-group">
+                <label for="price">Price per Share</label>
+                <input type="number" id="price" name="price" placeholder="Price per share" required min="0" step="any">
+                 <div class="form-error" id="price-error"></div>
+            </div>
+             <div class="form-error" id="form-error"></div> <!-- General form errors -->
 
-        </div>
-        <button type="submit" class="btn" id="buy-button">Add to Portfolio</button>
-        <button type="submit" class="btn" id="sell-button">Sell to Portfolio</button>
-    </form>
-`;
+            <div class="form-buttons" style="display: flex; gap: 10px; margin-top: 1rem;">
+                 <button type="submit" class="btn" id="buy-button">Buy Stock</button>
+                 <button type="button" class="btn" id="sell-button" style="background-color: #E53E3E;">Sell Stock</button> <!-- Changed to type="button" for sell -->
+            </div>
+        </form>
+    `;
+
+    const form = portfolioInputElement.querySelector('.buy-sell-stock-form');
+    const buyButton = portfolioInputElement.querySelector('#buy-button');
+    const sellButton = portfolioInputElement.querySelector('#sell-button');
+    const tickerInput = portfolioInputElement.querySelector('#ticker');
+    const quantityInput = portfolioInputElement.querySelector('#quantity');
+    const priceInput = portfolioInputElement.querySelector('#price');
+    const priceGroup = portfolioInputElement.querySelector('#price-group'); 
+
+    const tickerError = portfolioInputElement.querySelector('#ticker-error');
+    const quantityError = portfolioInputElement.querySelector('#quantity-error');
+    const priceError = portfolioInputElement.querySelector('#price-error');
+    const formError = portfolioInputElement.querySelector('#form-error');
+
+    const API_BASE_URL = 'http://localhost:3000/api';
+
+    const clearErrors = () => {
+        tickerError.textContent = '';
+        quantityError.textContent = '';
+        priceError.textContent = '';
+        formError.textContent = '';
+        tickerInput.style.borderColor = '';
+        quantityInput.style.borderColor = '';
+        priceInput.style.borderColor = '';
+    };
+
+    const displayError = (element, message) => {
+        if (element) {
+            element.textContent = message;
+            
+            const inputId = element.id.replace('-error', '');
+            const inputField = portfolioInputElement.querySelector(`#${inputId}`);
+            if (inputField) {
+                inputField.style.borderColor = 'red';
+            }
+        }
+    };
+
+    const refreshPortfolioData = () => {
+        console.log('Dispatching portfolioUpdated event');
+        document.dispatchEvent(new CustomEvent('portfolioUpdated'));
+    };
+
+    const handleBuySubmit = async (event) => {
+        event.preventDefault(); 
+        clearErrors();
+        formError.textContent = 'Processing...'; 
+
+        const symbol = tickerInput.value.trim().toUpperCase();
+        const quantity = parseFloat(quantityInput.value);
+        const purchasePrice = parseFloat(priceInput.value);
+        
+        let isValid = true;
+        if (!symbol) {
+            displayError(tickerError, 'Ticker symbol is required.');
+            isValid = false;
+        }
+        if (isNaN(quantity) || quantity <= 0) {
+            displayError(quantityError, 'Quantity must be a positive number.');
+            isValid = false;
+        }
+        if (isNaN(purchasePrice) || purchasePrice < 0) {
+            displayError(priceError, 'Price must be a non-negative number.');
+            isValid = false;
+        }
+        if (!isValid) {
+            formError.textContent = ''; 
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/portfolio/buy`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ symbol, quantity, purchasePrice }),
+            });
+
+            const result = await response.json(); 
+
+            if (!response.ok) {
+                throw new Error(result.message || `HTTP error! status: ${response.status}`);
+            }
+
+            console.log('Buy successful:', result);
+            formError.textContent = 'Stock purchased successfully!';
+            formError.style.color = 'green';
+            form.reset(); 
+            refreshPortfolioData(); 
+
+        } catch (error) {
+            console.error('Error buying stock:', error);
+            formError.textContent = `Error: ${error.message}`;
+            formError.style.color = 'red';
+        } finally {
+            
+            setTimeout(() => {
+                formError.textContent = '';
+                formError.style.color = ''; 
+            }, 5000);
+        }
+    };
+
+    const handleSellSubmit = async () => {
+        clearErrors();
+        formError.textContent = 'Processing...'; 
+
+        const symbol = tickerInput.value.trim().toUpperCase();
+        const quantity = parseFloat(quantityInput.value);
+        
+        let isValid = true;
+        if (!symbol) {
+            displayError(tickerError, 'Ticker symbol is required.');
+            isValid = false;
+        }
+        if (isNaN(quantity) || quantity <= 0) {
+            displayError(quantityError, 'Quantity must be a positive number.');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            formError.textContent = ''; 
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/portfolio/sell`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ symbol, quantity }),
+            });
+
+            const result = await response.json(); 
+
+            if (!response.ok) {
+                throw new Error(result.message || `HTTP error! status: ${response.status}`);
+            }
+
+            console.log('Sell successful:', result);
+            formError.textContent = 'Stock sold successfully!';
+            formError.style.color = 'green';
+            form.reset(); 
+            refreshPortfolioData(); 
+
+        } catch (error) {
+            console.error('Error selling stock:', error);
+            formError.textContent = `Error: ${error.message}`;
+            formError.style.color = 'red';
+        } finally {
+            
+            setTimeout(() => {
+                formError.textContent = '';
+                formError.style.color = ''; 
+            }, 5000);
+        }
+    };
+    
+    if (form) {
+        form.addEventListener('submit', handleBuySubmit); 
+    }
+    if (sellButton) {
+        sellButton.addEventListener('click', handleSellSubmit);
+    }
+
+} else {
+    console.error("Portfolio input element not found.");
+}

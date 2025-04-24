@@ -1,7 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "Basic Express Server",
+  "description": "Backend for Stock Portfolio Visualizer",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -10,12 +10,14 @@
   "keywords": [
     "express",
     "api",
-    "server"
+    "server",
+    "portfolio"
   ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.18.2"
   }
 }
