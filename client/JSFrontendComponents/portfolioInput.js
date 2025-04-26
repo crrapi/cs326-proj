@@ -22,16 +22,7 @@ if (portfolioInputElement) {
                 <label for="transaction-price">Price per Share (Buy or Sell)</label>
                 <input type="number" id="transaction-price" name="transactionPrice" placeholder="Price per share" required min="0" step="any">
                  <div class="form-error" id="transaction-price-error"></div>
-            </div>
-             <div class="form-error general-form-error" id="form-error"></div>
-
-            <div class="form-buttons" style="display: flex; gap: 10px; margin-top: 1rem;">
-                 <button type="submit" class="btn" id="buy-button">Buy Stock</button>
-                 <button type="button" class="btn" id="sell-button" style="background-color: #E53E3E;">Sell Stock</button>
-            </div>
-        </form>
-    `;
-
+`
     const form = portfolioInputElement.querySelector('.buy-sell-stock-form');
     const buyButton = portfolioInputElement.querySelector('#buy-button');
     const sellButton = portfolioInputElement.querySelector('#sell-button');
@@ -121,7 +112,37 @@ if (portfolioInputElement) {
             return;
         }
 
+        try {
+            const response = await fetch(`${API_BASE_URL}/portfolio/buy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol, quantity, purchasePrice, purchaseDate }),
+            });
 
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || `HTTP error! status: ${response.status}`);
+            }
+
+            console.log('Buy successful:', result);
+            formError.textContent = `Purchased ${quantity} ${symbol} successfully!`;
+            formError.style.color = 'green';
+            form.reset();
+            triggerGraphUpdate();
+
+        } catch (error) {
+            console.error('Error buying stock:', error);
+            formError.textContent = `Buy Error: ${error.message}`;
+            formError.style.color = 'red';
+        } finally {
+            setTimeout(() => {
+                if (formError.style.color === 'green' || formError.style.color === 'red') {
+                    formError.textContent = '';
+                    formError.style.color = '';
+                }
+            }, 7000);
+        }
     };
 
     const handleSellSubmit = async () => {
@@ -161,7 +182,37 @@ if (portfolioInputElement) {
             return;
         }
 
+        try {
+            const response = await fetch(`${API_BASE_URL}/portfolio/sell`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol, quantity, sellPrice, sellDate }),
+            });
 
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || `HTTP error! status: ${response.status}`);
+            }
+
+            console.log('Sell successful:', result);
+            formError.textContent = `Sold ${result.message.split(' ')[2]} ${symbol} successfully!`;
+            formError.style.color = 'green';
+            form.reset();
+            triggerGraphUpdate();
+
+        } catch (error) {
+            console.error('Error selling stock:', error);
+            formError.textContent = `Sell Error: ${error.message}`;
+            formError.style.color = 'red';
+        } finally {
+            setTimeout(() => {
+                if (formError.style.color === 'green' || formError.style.color === 'red') {
+                    formError.textContent = '';
+                    formError.style.color = '';
+                }
+            }, 7000);
+        }
     };
 
     if (form) {

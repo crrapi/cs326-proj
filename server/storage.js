@@ -52,6 +52,22 @@ async function readData() {
     }
 }
 
+async function writeData(data) {
+    try {
+        if (!data.defaultUser) data.defaultUser = { holdings: [], cashWithdrawnFromSales: 0 };
+        if (!data.defaultUser.holdings) data.defaultUser.holdings = [];
+        if (typeof data.defaultUser.cashWithdrawnFromSales !== 'number') data.defaultUser.cashWithdrawnFromSales = 0;
+
+        const jsonData = JSON.stringify(data, null, 2);
+        await fs.writeFile(dataFilePath, jsonData, 'utf-8');
+        console.log("Data successfully written to", dataFilePath);
+    } catch (error) {
+        console.error("Error writing data file:", error);
+        throw new Error("Failed to write data to storage.");
+    }
+}
+
 module.exports = {
     readData,
+    writeData,
 };

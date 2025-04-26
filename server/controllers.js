@@ -77,6 +77,168 @@ async function getPortfolio(req, res, next) {
     }
 }
 
+async function buyStock(req, res, next) {
+    const username = 'defaultUser';
+    const { symbol, quantity, purchasePrice, purchaseDate } = req.body;
+
+    if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
+        return res.status(400).json({ message: "Invalid or missing stock symbol." });
+    }
+    if (quantity === undefined || typeof quantity !== 'number' || quantity <= 0) {
+        return res.status(400).json({ message: "Invalid or missing quantity. Must be a positive number." });
+    }
+    if (purchasePrice === undefined || typeof purchasePrice !== 'number' || purchasePrice < 0) {
+        return res.status(400).json({ message: "Invalid or missing purchase price. Must be a non-negative number." });
+    }
+    if (!purchaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) {
+        return res.status(400).json({ message: "Invalid or missing purchase date. Required format: YYYY-MM-DD." });
+    }
+     const purchaseDt = new Date(purchaseDate + 'T00:00:00');
+     if (isNaN(purchaseDt.getTime())) {
+        return res.status(400).json({ message: "Invalid purchase date." });
+     }
+
+
+    const upperSymbol = symbol.trim().toUpperCase();
+
+    try {
+        const data = await storage.readData();
+        if (!data[username]) {
+            data[username] = { holdings: [], cashWithdrawnFromSales: 0 };
+        }
+        if (!data[username].holdings) {
+            data[username].holdings = [];
+        }
+         if (typeof data[username].cashWithdrawnFromSales !== 'number') {
+            data[username].cashWithdrawnFromSales = 0;
+         }
+
+        const newHoldingEntry = {
+            entryId: uuidv4(),
+            symbol: upperSymbol,
+            quantity: quantity,
+            purchaseDate: purchaseDate,
+            purchasePrice: purchasePrice,
+        };
+
+        data[username].holdings.push(newHoldingEntry);
+        console.log(`Added new holding entry for ${upperSymbol}. Entry ID: ${newHoldingEntry.entryId}, Quantity: ${quantity}, Price: ${purchasePrice}, Date: ${purchaseDate}`);
+
+        data[username].holdings.sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
+
+        await storage.writeData(data);
+        res.status(201).json({
+            message: `Successfully bought ${quantity} shares of ${upperSymbol}`,
+            entry: newHoldingEntry,
+            userData: {
+                 holdings: data[username].holdings,
+                 cashWithdrawnFromSales: data[username].cashWithdrawnFromSales
+            }
+        });
+    } catch (error) {
+        console.error("Error buying stock:", error);
+        next(error);
+    }
+}
+
+async function sellStock(req, res, next) {
+    const username = 'defaultUser';
+    const { symbol, quantity, sellPrice, sellDate } = req.body;
+
+    if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
+        return res.status(400).json({ message: "Invalid or missing stock symbol." });
+    }
+    if (quantity === undefined || typeof quantity !== 'number' || quantity <= 0) {
+        return res.status(400).json({ message: "Invalid or missing quantity to sell. Must be a positive number." });
+    }
+    if (sellPrice === undefined || typeof sellPrice !== 'number' || sellPrice < 0) {
+        return res.status(400).json({ message: "Invalid or missing sell price. Must be a non-negative number." });
+    }
+    if (!sellDate || !/^\d{4}-\d{2}-\d{2}$/.test(sellDate)) {
+        return res.status(400).json({ message: "Invalid or missing sell date. Required format: YYYY-MM-DD." });
+    }
+     const sellDt = new Date(sellDate + 'T00:00:00');
+     if (isNaN(sellDt.getTime())) {
+        return res.status(400).json({ message: "Invalid sell date." });
+     }
+
+    const upperSymbol = symbol.trim().toUpperCase();
+    let quantityToSell = quantity;
+
+    try {
+        const data = await storage.readData();
+        if (!data[username] || !data[username].holdings) {
+            return res.status(404).json({ message: `No portfolio found for user ${username}.` });
+        }
+
+        const holdings = data[username].holdings;
+        if (typeof data[username].cashWithdrawnFromSales !== 'number') {
+             data[username].cashWithdrawnFromSales = 0;
+        }
+
+        const relevantEntries = holdings
+            .filter(h => h.symbol === upperSymbol && (h.soldQuantity || 0) < h.quantity)
+            .sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
+
+        const totalAvailableQuantity = relevantEntries.reduce((sum, entry) => {
+            const availableInEntry = entry.quantity - (entry.soldQuantity || 0);
+            return sum + availableInEntry;
+        }, 0);
+
+        if (totalAvailableQuantity < quantityToSell) {
+            return res.status(400).json({
+                message: `Not enough shares to sell. You have ${totalAvailableQuantity.toFixed(6)} available ${upperSymbol}, tried to sell ${quantityToSell}.`
+            });
+        }
+
+        let totalCashFromThisSale = 0;
+        let sharesSoldInThisTx = 0;
+
+        for (const entry of relevantEntries) {
+            if (quantityToSell <= 0) break;
+
+             const purchaseDt = new Date(entry.purchaseDate + 'T00:00:00');
+             if (sellDt < purchaseDt) {
+                 console.warn(`Skipping entry ${entry.entryId} for sell date ${sellDate} as it was purchased later on ${entry.purchaseDate}`);
+                 // Continue to next entry if this one wasn't purchased yet
+                 continue;
+             }
+
+            const availableInEntry = entry.quantity - (entry.soldQuantity || 0);
+            const sellFromThisEntry = Math.min(quantityToSell, availableInEntry);
+
+            if (sellFromThisEntry > 0) {
+                entry.sellDate = sellDate;
+                entry.sellPrice = sellPrice;
+                entry.soldQuantity = (entry.soldQuantity || 0) + sellFromThisEntry;
+
+                quantityToSell -= sellFromThisEntry;
+                sharesSoldInThisTx += sellFromThisEntry;
+                totalCashFromThisSale += sellFromThisEntry * sellPrice;
+
+                console.log(`Sold ${sellFromThisEntry.toFixed(6)} shares from entry ${entry.entryId} (purchased ${entry.purchaseDate}). Remaining in entry: ${(entry.quantity - entry.soldQuantity).toFixed(6)}`);
+            }
+        }
+
+        data[username].cashWithdrawnFromSales += totalCashFromThisSale;
+
+        console.log(`Total sold in this transaction: ${sharesSoldInThisTx.toFixed(6)} shares of ${upperSymbol} for $${totalCashFromThisSale.toFixed(2)}.`);
+        console.log(`Total cash withdrawn from all sales: $${data[username].cashWithdrawnFromSales.toFixed(2)}`);
+
+        await storage.writeData(data);
+        res.status(200).json({
+            message: `Successfully sold ${sharesSoldInThisTx.toFixed(6)} shares of ${upperSymbol}`,
+             userData: {
+                 holdings: data[username].holdings,
+                 cashWithdrawnFromSales: data[username].cashWithdrawnFromSales
+             }
+        });
+
+    } catch (error) {
+        console.error("Error selling stock:", error);
+        next(error);
+    }
+}
 
 async function getRealtimeGraphData(req, res, next) {
     const username = 'defaultUser';
@@ -225,5 +387,7 @@ async function getRealtimeGraphData(req, res, next) {
 
 module.exports = {
     getPortfolio,
+    buyStock,
+    sellStock,
     getRealtimeGraphData
 };
