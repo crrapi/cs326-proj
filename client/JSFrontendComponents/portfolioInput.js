@@ -22,16 +22,7 @@ if (portfolioInputElement) {
                 <label for="transaction-price">Price per Share (Buy or Sell)</label>
                 <input type="number" id="transaction-price" name="transactionPrice" placeholder="Price per share" required min="0" step="any">
                  <div class="form-error" id="transaction-price-error"></div>
-            </div>
-             <div class="form-error general-form-error" id="form-error"></div>
-
-            <div class="form-buttons" style="display: flex; gap: 10px; margin-top: 1rem;">
-                 <button type="submit" class="btn" id="buy-button">Buy Stock</button>
-                 <button type="button" class="btn" id="sell-button" style="background-color: #E53E3E;">Sell Stock</button>
-            </div>
-        </form>
-    `;
-
+`
     const form = portfolioInputElement.querySelector('.buy-sell-stock-form');
     const buyButton = portfolioInputElement.querySelector('#buy-button');
     const sellButton = portfolioInputElement.querySelector('#sell-button');

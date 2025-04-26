@@ -1,0 +1,14 @@
+{
+    "defaultUser": {
+      "holdings": [
+        {
+          "entryId": "c4cd21f5-fbbe-4b46-8297-684646a0c8f8",
+          "symbol": "AAPL",
+          "quantity": 11111,
+          "purchaseDate": "2025-04-01",
+          "purchasePrice": 11
+        }
+      ],
+      "cashWithdrawnFromSales": 0
+    }
+  }
