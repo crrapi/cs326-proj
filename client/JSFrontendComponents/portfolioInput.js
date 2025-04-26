@@ -228,7 +228,7 @@ if (portfolioInputElement) {
             const errorElement = portfolioInputElement.querySelector(`#${errorId}`);
             if (errorElement) errorElement.textContent = '';
             input.style.borderColor = '';
-            if (formError.textContent && formError.style.color === 'red') {
+            if (formError && formError.textContent && formError.style.color === 'red') {
                 formError.textContent = '';
             }
         });
