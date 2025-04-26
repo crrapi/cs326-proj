@@ -77,6 +77,7 @@ async function getPortfolio(req, res, next) {
     }
 }
 
+
 async function getRealtimeGraphData(req, res, next) {
     const username = 'defaultUser';
     try {

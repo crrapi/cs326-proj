@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Portfolio Visualizer</title>
     <link rel="stylesheet" href="main.css">
 </head>
+
 <body>
     <header class="header"></header>
 
@@ -13,19 +15,30 @@
         <div class="main-content">
             <section class="portfolio-input"></section>
 
-
             <section class="visualization">
                 <h2>Portfolio Visualization</h2>
-                <div class="canvas-placeholder"></div>
+                <div style="margin-bottom: 1rem; text-align: center;">
+                    <button class="btn" id="generate-graph-button">Generate/Update Graph</button>
+                    <p id="graph-status" style="font-size: 0.9em; margin-top: 5px; color: #64748b; min-height: 1.2em;">
+                    </p>
+                </div>
+                <div class="canvas-placeholder" style="min-height: 400px; background-color: #f0f0f0;">
 
-                
-                <div class="portfolio-stats"></div>
+                </div>
+
+
+                <div class="portfolio-stats">
+
+                </div>
             </section>
         </div>
     </main>
+
     <script type="module" src="./index.js"></script>
-    <script type="module" src="./JSFrontendComponents//header.js"></script>
+    <script type="module" src="./JSFrontendComponents/header.js"></script>
     <script type="module" src="./JSFrontendComponents/portfolioStats.js"></script>
     <script type="module" src="./JSFrontendComponents/portfolioInput.js"></script>
+
 </body>
+
 </html>
