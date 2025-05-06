@@ -1,4 +1,4 @@
-const storage = require('./storage');
+const { User, Holding } = require('./models');
 const fetch = require('node-fetch');
 const { v4: uuidv4 } = require('uuid');
 
@@ -59,18 +59,10 @@ async function fetchHistoricalData(symbol) {
 }
 
 async function getPortfolio(req, res, next) {
-    const username = 'defaultUser';
     try {
-        const data = await storage.readData();
-        if (!data[username]) {
-            console.log(`User ${username} not found, returning default structure.`);
-             res.json({ holdings: [], cashWithdrawnFromSales: 0 });
-        } else {
-            res.json({
-                holdings: data[username].holdings || [],
-                cashWithdrawnFromSales: data[username].cashWithdrawnFromSales || 0
-            });
-        }
+        const [user] = await User.findOrCreate({ where: { username: 'defaultUser' }, defaults: { username: 'defaultUser' } });
+        const holdings = await Holding.findAll({ where: { userId: user.id }, order: [['purchaseDate', 'ASC']] });
+        res.json({ holdings, cashWithdrawnFromSales: user.cashWithdrawnFromSales });
     } catch (error) {
         console.error("Error fetching portfolio:", error);
         next(error);
@@ -78,7 +70,6 @@ async function getPortfolio(req, res, next) {
 }
 
 async function buyStock(req, res, next) {
-    const username = 'defaultUser';
     const { symbol, quantity, purchasePrice, purchaseDate } = req.body;
 
     if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
@@ -93,46 +84,23 @@ async function buyStock(req, res, next) {
     if (!purchaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) {
         return res.status(400).json({ message: "Invalid or missing purchase date. Required format: YYYY-MM-DD." });
     }
-     const purchaseDt = new Date(purchaseDate + 'T00:00:00');
-     if (isNaN(purchaseDt.getTime())) {
+    const purchaseDt = new Date(purchaseDate + 'T00:00:00');
+    if (isNaN(purchaseDt.getTime())) {
         return res.status(400).json({ message: "Invalid purchase date." });
-     }
-
+    }
 
     const upperSymbol = symbol.trim().toUpperCase();
 
     try {
-        const data = await storage.readData();
-        if (!data[username]) {
-            data[username] = { holdings: [], cashWithdrawnFromSales: 0 };
-        }
-        if (!data[username].holdings) {
-            data[username].holdings = [];
-        }
-         if (typeof data[username].cashWithdrawnFromSales !== 'number') {
-            data[username].cashWithdrawnFromSales = 0;
-         }
-
-        const newHoldingEntry = {
-            entryId: uuidv4(),
-            symbol: upperSymbol,
-            quantity: quantity,
-            purchaseDate: purchaseDate,
-            purchasePrice: purchasePrice,
-        };
-
-        data[username].holdings.push(newHoldingEntry);
-        console.log(`Added new holding entry for ${upperSymbol}. Entry ID: ${newHoldingEntry.entryId}, Quantity: ${quantity}, Price: ${purchasePrice}, Date: ${purchaseDate}`);
-
-        data[username].holdings.sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
-
-        await storage.writeData(data);
+        const [user] = await User.findOrCreate({ where: { username: 'defaultUser' }, defaults: { username: 'defaultUser' } });
+        const entry = await Holding.create({ userId: user.id, symbol: upperSymbol, quantity, purchaseDate, purchasePrice, entryId: uuidv4() });
+        const holdings = await Holding.findAll({ where: { userId: user.id }, order: [['purchaseDate', 'ASC']] });
         res.status(201).json({
             message: `Successfully bought ${quantity} shares of ${upperSymbol}`,
-            entry: newHoldingEntry,
+            entry,
             userData: {
-                 holdings: data[username].holdings,
-                 cashWithdrawnFromSales: data[username].cashWithdrawnFromSales
+                holdings,
+                cashWithdrawnFromSales: user.cashWithdrawnFromSales
             }
         });
     } catch (error) {
@@ -142,7 +110,6 @@ async function buyStock(req, res, next) {
 }
 
 async function sellStock(req, res, next) {
-    const username = 'defaultUser';
     const { symbol, quantity, sellPrice, sellDate } = req.body;
 
     if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
@@ -157,27 +124,20 @@ async function sellStock(req, res, next) {
     if (!sellDate || !/^\d{4}-\d{2}-\d{2}$/.test(sellDate)) {
         return res.status(400).json({ message: "Invalid or missing sell date. Required format: YYYY-MM-DD." });
     }
-     const sellDt = new Date(sellDate + 'T00:00:00');
-     if (isNaN(sellDt.getTime())) {
+    const sellDt = new Date(sellDate + 'T00:00:00');
+    if (isNaN(sellDt.getTime())) {
         return res.status(400).json({ message: "Invalid sell date." });
-     }
+    }
 
     const upperSymbol = symbol.trim().toUpperCase();
     let quantityToSell = quantity;
 
     try {
-        const data = await storage.readData();
-        if (!data[username] || !data[username].holdings) {
-            return res.status(404).json({ message: `No portfolio found for user ${username}.` });
-        }
-
-        const holdings = data[username].holdings;
-        if (typeof data[username].cashWithdrawnFromSales !== 'number') {
-             data[username].cashWithdrawnFromSales = 0;
-        }
+        const user = await User.findOne({ where: { username: 'defaultUser' } });
+        const holdings = await Holding.findAll({ where: { userId: user.id, symbol: upperSymbol } });
 
         const relevantEntries = holdings
-            .filter(h => h.symbol === upperSymbol && (h.soldQuantity || 0) < h.quantity)
+            .filter(h => (h.soldQuantity || 0) < h.quantity)
             .sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
 
         const totalAvailableQuantity = relevantEntries.reduce((sum, entry) => {
@@ -197,12 +157,11 @@ async function sellStock(req, res, next) {
         for (const entry of relevantEntries) {
             if (quantityToSell <= 0) break;
 
-             const purchaseDt = new Date(entry.purchaseDate + 'T00:00:00');
-             if (sellDt < purchaseDt) {
-                 console.warn(`Skipping entry ${entry.entryId} for sell date ${sellDate} as it was purchased later on ${entry.purchaseDate}`);
-                 // Continue to next entry if this one wasn't purchased yet
-                 continue;
-             }
+            const purchaseDt = new Date(entry.purchaseDate + 'T00:00:00');
+            if (sellDt < purchaseDt) {
+                console.warn(`Skipping entry ${entry.entryId} for sell date ${sellDate} as it was purchased later on ${entry.purchaseDate}`);
+                continue;
+            }
 
             const availableInEntry = entry.quantity - (entry.soldQuantity || 0);
             const sellFromThisEntry = Math.min(quantityToSell, availableInEntry);
@@ -220,18 +179,19 @@ async function sellStock(req, res, next) {
             }
         }
 
-        data[username].cashWithdrawnFromSales += totalCashFromThisSale;
+        user.cashWithdrawnFromSales += totalCashFromThisSale;
+        await Promise.all(relevantEntries.map(e => e.save()));
+        await user.save();
 
         console.log(`Total sold in this transaction: ${sharesSoldInThisTx.toFixed(6)} shares of ${upperSymbol} for $${totalCashFromThisSale.toFixed(2)}.`);
-        console.log(`Total cash withdrawn from all sales: $${data[username].cashWithdrawnFromSales.toFixed(2)}`);
+        console.log(`Total cash withdrawn from all sales: $${user.cashWithdrawnFromSales.toFixed(2)}`);
 
-        await storage.writeData(data);
         res.status(200).json({
             message: `Successfully sold ${sharesSoldInThisTx.toFixed(6)} shares of ${upperSymbol}`,
-             userData: {
-                 holdings: data[username].holdings,
-                 cashWithdrawnFromSales: data[username].cashWithdrawnFromSales
-             }
+            userData: {
+                holdings: await Holding.findAll({ where: { userId: user.id } }),
+                cashWithdrawnFromSales: user.cashWithdrawnFromSales
+            }
         });
 
     } catch (error) {
@@ -241,29 +201,25 @@ async function sellStock(req, res, next) {
 }
 
 async function getRealtimeGraphData(req, res, next) {
-    const username = 'defaultUser';
     try {
-        const data = await storage.readData();
-        const userData = data[username];
+        const user = await User.findOne({ where: { username: 'defaultUser' } });
+        const holdings = await Holding.findAll({ where: { userId: user.id } });
 
-        if (!userData || !userData.holdings || userData.holdings.length === 0) {
-            console.log(`No holdings found for user ${username}, returning empty graph data.`);
+        if (!holdings || holdings.length === 0) {
+            console.log(`No holdings found for user defaultUser, returning empty graph data.`);
             return res.json([]);
         }
 
-        // --- Find the earliest purchase date ---
         let earliestPurchaseDate = null;
-        if (userData.holdings.length > 0) {
-            earliestPurchaseDate = userData.holdings.reduce((earliest, current) => {
+        if (holdings.length > 0) {
+            earliestPurchaseDate = holdings.reduce((earliest, current) => {
                 const currentDt = new Date(current.purchaseDate + 'T00:00:00');
                 return earliest === null || currentDt < earliest ? currentDt : earliest;
             }, null);
         }
         console.log("Earliest purchase date found:", earliestPurchaseDate?.toISOString().split('T')[0] || "N/A");
-        // --- End Find earliest purchase date ---
 
-
-        const allSymbols = [...new Set(userData.holdings.map(h => h.symbol))];
+        const allSymbols = [...new Set(holdings.map(h => h.symbol))];
 
         console.log(`Generating graph data for symbols: ${allSymbols.join(', ')}`);
 
@@ -299,13 +255,11 @@ async function getRealtimeGraphData(req, res, next) {
 
         let sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
 
-        // --- Filter dates based on earliest purchase ---
         if (earliestPurchaseDate) {
             const earliestPurchaseDateStr = earliestPurchaseDate.toISOString().split('T')[0];
             sortedDates = sortedDates.filter(dateStr => dateStr >= earliestPurchaseDateStr);
             console.log(`Filtered dates to start from ${earliestPurchaseDateStr}. ${sortedDates.length} dates remaining.`);
         }
-        // --- End Filter dates ---
 
         if (!sortedDates || sortedDates.length === 0) {
             console.log("No historical dates remaining after filtering, returning empty graph data.");
@@ -329,17 +283,16 @@ async function getRealtimeGraphData(req, res, next) {
             const currentDt = new Date(dateStr + 'T00:00:00');
             const activeHoldingsBySymbol = {};
 
-            userData.holdings.forEach(entry => {
+            holdings.forEach(entry => {
                 const purchaseDt = new Date(entry.purchaseDate + 'T00:00:00');
                 const sellDt = entry.sellDate ? new Date(entry.sellDate + 'T00:00:00') : null;
 
                 let sharesHeldFromEntry = 0;
                 if (purchaseDt <= currentDt) {
-                   const effectivelySoldQuantity = (sellDt && sellDt <= currentDt) ? (entry.soldQuantity || 0) : 0;
-                   sharesHeldFromEntry = entry.quantity - effectivelySoldQuantity;
+                    const effectivelySoldQuantity = (sellDt && sellDt <= currentDt) ? (entry.soldQuantity || 0) : 0;
+                    sharesHeldFromEntry = entry.quantity - effectivelySoldQuantity;
                 }
                 const activeQuantityInEntry = sharesHeldFromEntry;
-
 
                 if (activeQuantityInEntry > 1e-9) {
                     if (!activeHoldingsBySymbol[entry.symbol]) {
@@ -351,18 +304,18 @@ async function getRealtimeGraphData(req, res, next) {
 
             const stocksForDate = [];
             Object.entries(activeHoldingsBySymbol).forEach(([symbol, totalActiveShares]) => {
-                 const price = priceMap[dateStr]?.[symbol];
+                const price = priceMap[dateStr]?.[symbol];
 
-                 if (price !== undefined && totalActiveShares > 1e-9) {
+                if (price !== undefined && totalActiveShares > 1e-9) {
                     stocksForDate.push({
                         symbol: symbol,
                         price: price,
                         shares: totalActiveShares,
                         color: getStockColor(symbol)
                     });
-                 } else if (totalActiveShares > 1e-9) {
-                      console.warn(`Missing price for ${symbol} on ${dateStr}. Stock value for this date will be incomplete.`);
-                 }
+                } else if (totalActiveShares > 1e-9) {
+                    console.warn(`Missing price for ${symbol} on ${dateStr}. Stock value for this date will be incomplete.`);
+                }
             });
 
             const totalValue = stocksForDate.reduce((sum, stock) => sum + (stock.price * stock.shares), 0);
@@ -384,10 +337,74 @@ async function getRealtimeGraphData(req, res, next) {
     }
 }
 
+// --- User CRUD ---
+async function listUsers(req, res, next) {
+    const users = await User.findAll();
+    res.json(users);
+}
+async function createUser(req, res, next) {
+    const { username } = req.body;
+    const user = await User.create({ username });
+    res.status(201).json(user);
+}
+async function getUser(req, res, next) {
+    const user = await User.findByPk(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+}
+async function updateUser(req, res, next) {
+    const user = await User.findByPk(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    await user.update(req.body);
+    res.json(user);
+}
+async function deleteUser(req, res, next) {
+    const user = await User.findByPk(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    await user.destroy();
+    res.status(204).end();
+}
+
+// --- Holding CRUD ---
+async function listHoldings(req, res, next) {
+    const holdings = await Holding.findAll();
+    res.json(holdings);
+}
+async function createHolding(req, res, next) {
+    const holding = await Holding.create(req.body);
+    res.status(201).json(holding);
+}
+async function getHolding(req, res, next) {
+    const holding = await Holding.findByPk(req.params.id);
+    if (!holding) return res.status(404).json({ message: 'Holding not found' });
+    res.json(holding);
+}
+async function updateHolding(req, res, next) {
+    const holding = await Holding.findByPk(req.params.id);
+    if (!holding) return res.status(404).json({ message: 'Holding not found' });
+    await holding.update(req.body);
+    res.json(holding);
+}
+async function deleteHolding(req, res, next) {
+    const holding = await Holding.findByPk(req.params.id);
+    if (!holding) return res.status(404).json({ message: 'Holding not found' });
+    await holding.destroy();
+    res.status(204).end();
+}
 
 module.exports = {
     getPortfolio,
     buyStock,
     sellStock,
-    getRealtimeGraphData
+    getRealtimeGraphData,
+    listUsers,
+    createUser,
+    getUser,
+    updateUser,
+    deleteUser,
+    listHoldings,
+    createHolding,
+    getHolding,
+    updateHolding,
+    deleteHolding
 };
