@@ -1,7 +1,9 @@
 const { User, Holding } = require('./models');
 const fetch = require('node-fetch');
 const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_and_random_key_please_change_this_for_production';
 const FMP_API_KEY = process.env.FMP_API_KEY || "ydVoHu8hsFyCf0vukGtKVgDuJzCfWkRc";
 const FMP_API_BASE_URL = "https://financialmodelingprep.com/api/v3";
 
@@ -60,7 +62,7 @@ async function fetchHistoricalData(symbol) {
 
 async function getPortfolio(req, res, next) {
     try {
-        const [user] = await User.findOrCreate({ where: { username: 'defaultUser' }, defaults: { username: 'defaultUser' } });
+        const user = await User.findByPk(req.user.id);
         const holdings = await Holding.findAll({ where: { userId: user.id }, order: [['purchaseDate', 'ASC']] });
         res.json({ holdings, cashWithdrawnFromSales: user.cashWithdrawnFromSales });
     } catch (error) {
@@ -92,7 +94,7 @@ async function buyStock(req, res, next) {
     const upperSymbol = symbol.trim().toUpperCase();
 
     try {
-        const [user] = await User.findOrCreate({ where: { username: 'defaultUser' }, defaults: { username: 'defaultUser' } });
+        const user = await User.findByPk(req.user.id);
         const entry = await Holding.create({ userId: user.id, symbol: upperSymbol, quantity, purchaseDate, purchasePrice, entryId: uuidv4() });
         const holdings = await Holding.findAll({ where: { userId: user.id }, order: [['purchaseDate', 'ASC']] });
         res.status(201).json({
@@ -133,7 +135,7 @@ async function sellStock(req, res, next) {
     let quantityToSell = quantity;
 
     try {
-        const user = await User.findOne({ where: { username: 'defaultUser' } });
+        const user = await User.findByPk(req.user.id);
         const holdings = await Holding.findAll({ where: { userId: user.id, symbol: upperSymbol } });
 
         const relevantEntries = holdings
@@ -202,7 +204,7 @@ async function sellStock(req, res, next) {
 
 async function getRealtimeGraphData(req, res, next) {
     try {
-        const user = await User.findOne({ where: { username: 'defaultUser' } });
+        const user = await User.findByPk(req.user.id);
         const holdings = await Holding.findAll({ where: { userId: user.id } });
 
         if (!holdings || holdings.length === 0) {
@@ -367,30 +369,128 @@ async function deleteUser(req, res, next) {
 
 // --- Holding CRUD ---
 async function listHoldings(req, res, next) {
-    const holdings = await Holding.findAll();
-    res.json(holdings);
+    try {
+        const holdings = await Holding.findAll();
+        res.json(holdings);
+    } catch (error) {
+        next(error);
+    }
 }
 async function createHolding(req, res, next) {
-    const holding = await Holding.create(req.body);
-    res.status(201).json(holding);
+    try {
+        let holdingData = { ...req.body };
+
+        if (!holdingData.userId) {
+            const user = await User.findByPk(req.user.id);
+            holdingData.userId = user.id;
+        }
+
+        const holding = await Holding.create(holdingData);
+        res.status(201).json(holding);
+
+    } catch (error) {
+        console.error("Error in createHolding controller:", error);
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError' || error.name === 'SequelizeForeignKeyConstraintError') {
+            return res.status(400).json({
+                error: error.errors ? error.errors.map(e => e.message).join(', ') : 'Database operation failed'
+            });
+        }
+        next(error);
+    }
 }
+
 async function getHolding(req, res, next) {
-    const holding = await Holding.findByPk(req.params.id);
-    if (!holding) return res.status(404).json({ message: 'Holding not found' });
-    res.json(holding);
+    try {
+        const holding = await Holding.findByPk(req.params.id);
+        if (!holding) return res.status(404).json({ message: 'Holding not found' });
+        res.json(holding);
+    } catch (error) {
+        next(error);
+    }
 }
 async function updateHolding(req, res, next) {
-    const holding = await Holding.findByPk(req.params.id);
-    if (!holding) return res.status(404).json({ message: 'Holding not found' });
-    await holding.update(req.body);
-    res.json(holding);
+    try {
+        const holding = await Holding.findByPk(req.params.id);
+        if (!holding) return res.status(404).json({ message: 'Holding not found' });
+        await holding.update(req.body);
+        res.json(holding);
+    } catch (error) {
+        next(error);
+    }
 }
+
 async function deleteHolding(req, res, next) {
-    const holding = await Holding.findByPk(req.params.id);
-    if (!holding) return res.status(404).json({ message: 'Holding not found' });
-    await holding.destroy();
-    res.status(204).end();
+    try {
+        const holding = await Holding.findByPk(req.params.id);
+        if (!holding) return res.status(404).json({ message: 'Holding not found' });
+        await holding.destroy();
+        res.status(204).end();
+    } catch (error) {
+        next(error);
+    }
 }
+
+async function signup(req, res, next) {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required.' });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+        }
+
+        const existingUser = await User.findOne({ where: { username } });
+        if (existingUser) {
+            return res.status(409).json({ message: 'Username already taken.' });
+        }
+
+        const user = await User.create({ username, password });
+        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
+
+        res.status(201).json({
+            message: 'User created successfully',
+            token,
+            user: { id: user.id, username: user.username }
+        });
+    } catch (error) {
+        if (error.name === 'SequelizeValidationError') {
+            return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+        }
+        console.error("Signup Error:", error);
+        next(error);
+    }
+};
+
+async function login(req, res, next) {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required.' });
+        }
+
+        const user = await User.findOne({ where: { username } });
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+
+        const isMatch = await user.isValidPassword(password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+
+        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
+
+        res.json({
+            message: 'Login successful',
+            token,
+            user: { id: user.id, username: user.username }
+        });
+    } catch (error) {
+        console.error("Login Error:", error);
+        next(error);
+    }
+};
 
 module.exports = {
     getPortfolio,
@@ -406,5 +506,7 @@ module.exports = {
     createHolding,
     getHolding,
     updateHolding,
-    deleteHolding
+    deleteHolding,
+    signup,
+    login
 };

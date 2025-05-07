@@ -1,3 +1,4 @@
+import { fetchWithAuth } from '../authFetch';
 const portfolioInputElement = document.querySelector(".portfolio-input");
 if (portfolioInputElement) {
     portfolioInputElement.innerHTML = `
@@ -121,9 +122,8 @@ if (portfolioInputElement) {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/portfolio/buy`, {
+            const response = await fetchWithAuth('/portfolio/buy', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ symbol, quantity, purchasePrice, purchaseDate }),
             });
 
@@ -191,12 +191,11 @@ if (portfolioInputElement) {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/portfolio/sell`, {
+            const response = await fetchWithAuth('/portfolio/sell', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ symbol, quantity, sellPrice, sellDate }),
             });
-
+    
             const result = await response.json();
 
             if (!response.ok) {

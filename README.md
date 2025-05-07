@@ -13,7 +13,8 @@ Our Stock Portfolio Visualizer creates a more intuitive way to visualize stock p
 ### Key Features
 - Portfolio Input: Users can input their stock purchases (ticker symbol, quantity, purchase date, and price)
 - Data Integration: Connects to stock APIs to fetch current and historical price data
-- Persistent Storage: Saves portfolio information in a database for easy access
+- Persistent Storage: Saves portfolio information in a SQLite database using Sequelize for easy access and management.
+- **Robust API Endpoints:** Implemented server-side validation using Zod (e.g., for `POST /api/holdings`) to ensure data integrity. This includes checks for required fields and specific data types, returning clear `400 Bad Request` error messages for invalid input (e.g., `{ error: "Quantity must be a positive integer" }` for non-positive integer quantities).
 - Intuitive Visualization: Uses p5.js to create color-coded, layered visualizations that show how each stock contributes to overall portfolio performance
 - Performance Metrics: Displays key portfolio statistics and metrics to complement the visual representation
 
@@ -25,23 +26,24 @@ As investors ourselves, we understand the challenge of quickly assessing portfol
 ### Roman Pisani
 Role: Backend Developer & UI Designer
 - Issues:
-  1. Design and implement database schema for storing portfolio data
-  2. Create p5.js visualization component for stock portfolio rendering
-  3. Develop CSS styling and branding elements for consistent user experience
+  1. Design and implement database schema for storing portfolio data (SQLite & Sequelize).
+  2. Create p5.js visualization component for stock portfolio rendering.
+  3. Develop CSS styling and branding elements for consistent user experience.
+  4. **Implement server-side input validation for API endpoints (e.g., using Zod for the `/api/holdings` route) to ensure data integrity and provide specific error feedback, including Postman tests for verification.** (Milestone 7)
 
 ### Christopher Rrapi
 Role: API Integration Specialist
 - Issues:
-  1. Research and select appropriate stock market data API
-  2. Develop interface layer for communicating with selected stock API
-  3. Implement user authentication and account management system
+  1. Research and select appropriate stock market data API.
+  2. Develop interface layer for communicating with selected stock API.
+  3. Implement user authentication and account management system.
 
 ### Ram Koukuntla
 Role: Frontend Developer & API Routes Implementer
 - Issues:
-  1. Create frontend user interface components (buttons, forms, inputs)
-  2. Design and implement page layout and navigation structure
-  3. Develop Express API routes that connect frontend with database schema and stock API interface
+  1. Create frontend user interface components (buttons, forms, inputs).
+  2. Design and implement page layout and navigation structure.
+  3. Develop Express API routes that connect frontend with database schema and stock API interface.
 
 # UI Designs
 

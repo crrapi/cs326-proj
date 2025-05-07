@@ -1,5 +1,6 @@
 import './style.css';
 import p5 from 'p5';
+import { fetchWithAuth } from './authFetch';
 
 const API_BASE_URL = 'http://localhost:3000/api';
 
@@ -13,6 +14,7 @@ let isFetchingGraphData = false;
 
 const graphStatusElement = document.getElementById('graph-status');
 const generateGraphButton = document.getElementById('generate-graph-button');
+
 
 async function fetchAndUpdateGraphData() {
     if (isFetchingGraphData) {
@@ -29,7 +31,7 @@ async function fetchAndUpdateGraphData() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/portfolio/realtime-graph`);
+        const response = await fetchWithAuth('/portfolio/realtime-graph');
 
         if (!response.ok) {
             let errorData = { message: `HTTP error! status: ${response.status}` };
@@ -49,16 +51,16 @@ async function fetchAndUpdateGraphData() {
             processGraphData(p5Instance);
             p5Instance.redraw();
             if (graphStatusElement) {
-                 const message = rawGraphData.length > 0 ? `Graph updated: ${new Date().toLocaleTimeString()}` : "Graph updated (No data to display)";
-                 graphStatusElement.textContent = message;
+                const message = rawGraphData.length > 0 ? `Graph updated: ${new Date().toLocaleTimeString()}` : "Graph updated (No data to display)";
+                graphStatusElement.textContent = message;
                 graphStatusElement.style.color = 'green';
             }
         } else {
-             console.warn("p5 instance not ready when data was fetched.");
-             if (graphStatusElement) {
+            console.warn("p5 instance not ready when data was fetched.");
+            if (graphStatusElement) {
                 graphStatusElement.textContent = "Data fetched, graph ready soon...";
                 graphStatusElement.style.color = '#f59e0b';
-             }
+            }
         }
 
     } catch (error) {
@@ -76,14 +78,14 @@ async function fetchAndUpdateGraphData() {
         }
     } finally {
         isFetchingGraphData = false;
-         if (generateGraphButton) generateGraphButton.disabled = false;
-         setTimeout(() => {
-             if (graphStatusElement && (graphStatusElement.style.color === 'green' || graphStatusElement.style.color === 'red')) {
+        if (generateGraphButton) generateGraphButton.disabled = false;
+        setTimeout(() => {
+            if (graphStatusElement && (graphStatusElement.style.color === 'green' || graphStatusElement.style.color === 'red')) {
                 const idleMessage = transformedData.length > 0 ? 'Graph generated. Ready for update.' : 'Ready to generate graph.';
                 graphStatusElement.textContent = idleMessage;
                 graphStatusElement.style.color = '#64748b';
-             }
-         }, 7000);
+            }
+        }, 7000);
     }
 }
 
@@ -108,8 +110,8 @@ function processGraphData(p) {
         }
 
         dailyData.stocks.forEach(stock => {
-             if (!stock || typeof stock.symbol !== 'string' || typeof stock.price !== 'number' || typeof stock.shares !== 'number' || typeof stock.color !== 'string') {
-                 console.warn("Skipping invalid stock data within a day:", stock, "on date", dailyData.date);
+            if (!stock || typeof stock.symbol !== 'string' || typeof stock.price !== 'number' || typeof stock.shares !== 'number' || typeof stock.color !== 'string') {
+                console.warn("Skipping invalid stock data within a day:", stock, "on date", dailyData.date);
                 return;
             }
 
@@ -126,7 +128,7 @@ function processGraphData(p) {
         });
 
         transformedData.push({
-             timestamp: new Date(dailyData.date + 'T00:00:00'),
+            timestamp: new Date(dailyData.date + 'T00:00:00'),
             values: values,
             totalValue: totalValueThisDay
         });
@@ -144,7 +146,7 @@ function processGraphData(p) {
     transformedData.sort((a, b) => a.timestamp - b.timestamp);
 
     console.log("Processed Data for graph:", transformedData.length, "points");
-    console.log("Unique Stocks for legend:", uniqueStocks.map(s=>s.symbol));
+    console.log("Unique Stocks for legend:", uniqueStocks.map(s => s.symbol));
     console.log("Max Total Value for Y-axis:", maxTotalValue);
 }
 
@@ -177,7 +179,7 @@ const sketch = (p) => {
         const numYLabels = 5;
         for (let i = 0; i <= numYLabels; i++) {
             const y = p.map(i, 0, numYLabels, p.height - padding, padding);
-             if (y < padding / 2) continue;
+            if (y < padding / 2) continue;
             p.line(padding, y, p.width - padding / 2, y);
         }
 
@@ -192,16 +194,16 @@ const sketch = (p) => {
             p.textAlign(p.CENTER, p.CENTER);
             p.textSize(14);
 
-             let message = "Click 'Generate/Update Graph' to load data.";
-             if (isFetchingGraphData) {
-                 message = "Loading graph data...";
-             } else if (rawGraphData && rawGraphData.length > 0 && transformedData.length < 2) {
-                 message = "Not enough historical data points to draw graph.";
-             } else if (rawGraphData && rawGraphData.length === 0 && graphStatusElement && graphStatusElement.textContent.startsWith("Error")) {
-                  message = graphStatusElement.textContent;
-             } else if (rawGraphData && rawGraphData.length === 0 && !isFetchingGraphData) {
-                  message = "No portfolio data found or API returned no history.";
-             }
+            let message = "Click 'Generate/Update Graph' to load data.";
+            if (isFetchingGraphData) {
+                message = "Loading graph data...";
+            } else if (rawGraphData && rawGraphData.length > 0 && transformedData.length < 2) {
+                message = "Not enough historical data points to draw graph.";
+            } else if (rawGraphData && rawGraphData.length === 0 && graphStatusElement && graphStatusElement.textContent.startsWith("Error")) {
+                message = graphStatusElement.textContent;
+            } else if (rawGraphData && rawGraphData.length === 0 && !isFetchingGraphData) {
+                message = "No portfolio data found or API returned no history.";
+            }
 
             p.text(message, p.width / 2, p.height / 2);
             drawAxisLabels(p, numYLabels);
@@ -282,12 +284,12 @@ const sketch = (p) => {
         for (let i = 0; i <= numYLabels; i++) {
             const value = p.map(i, 0, numYLabels, 0, effectiveMaxY);
             const y = p.map(value, 0, maxTotalValue, p.height - padding, padding);
-             if (y < padding / 2) continue;
+            if (y < padding / 2) continue;
 
-             let labelText = `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-             if (value >= 1e9) labelText = `$${(value / 1e9).toFixed(1)}B`;
-             else if (value >= 1e6) labelText = `$${(value / 1e6).toFixed(1)}M`;
-             else if (value >= 1e3) labelText = `$${(value / 1e3).toFixed(1)}K`;
+            let labelText = `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+            if (value >= 1e9) labelText = `$${(value / 1e9).toFixed(1)}B`;
+            else if (value >= 1e6) labelText = `$${(value / 1e6).toFixed(1)}M`;
+            else if (value >= 1e3) labelText = `$${(value / 1e3).toFixed(1)}K`;
 
             p.text(labelText, padding - 8, y);
         }
@@ -295,9 +297,9 @@ const sketch = (p) => {
         p.textAlign(p.CENTER, p.TOP);
         const dataLength = transformedData.length;
         if (dataLength > 0) {
-             const approxLabelWidth = 60;
-             const maxPossibleLabels = Math.floor((p.width - padding * 1.5) / approxLabelWidth);
-             const numXLabels = Math.min(dataLength, Math.max(2, maxPossibleLabels), 7);
+            const approxLabelWidth = 60;
+            const maxPossibleLabels = Math.floor((p.width - padding * 1.5) / approxLabelWidth);
+            const numXLabels = Math.min(dataLength, Math.max(2, maxPossibleLabels), 7);
 
             for (let i = 0; i < numXLabels; i++) {
                 let index;
@@ -309,20 +311,20 @@ const sketch = (p) => {
                 index = Math.max(0, Math.min(index, dataLength - 1));
 
                 const dataPoint = transformedData[index];
-                 if (!dataPoint || !dataPoint.timestamp || isNaN(dataPoint.timestamp.getTime())) continue;
+                if (!dataPoint || !dataPoint.timestamp || isNaN(dataPoint.timestamp.getTime())) continue;
 
                 const x = p.map(index, 0, dataLength - 1, padding, p.width - padding);
 
                 const dateLabel = dataPoint.timestamp.toLocaleDateString(undefined, {
                     month: 'short',
                     day: 'numeric',
-                     year: (numXLabels > 4 || dataLength < 10) ? undefined : '2-digit'
+                    year: (numXLabels > 4 || dataLength < 10) ? undefined : '2-digit'
                 });
                 p.text(dateLabel, x, p.height - padding + 8);
             }
         } else {
-             p.textAlign(p.CENTER, p.TOP);
-             p.text("Date Range", p.width/2, p.height - padding + 8);
+            p.textAlign(p.CENTER, p.TOP);
+            p.text("Date Range", p.width / 2, p.height - padding + 8);
         }
     }
 
@@ -344,8 +346,8 @@ const sketch = (p) => {
             const itemWidth = legendBoxSize + legendTextPadding + textWidth;
 
             if (currentX + itemWidth > p.width - padding / 2 && currentX !== legendXStart) {
-                 console.warn("Legend might overflow canvas width.");
-             }
+                console.warn("Legend might overflow canvas width.");
+            }
 
             p.fill(stock.color);
             p.noStroke();
@@ -363,11 +365,11 @@ const sketch = (p) => {
         if (!canvasContainer) return;
 
         const newWidth = canvasContainer.offsetWidth;
-         if (newWidth > 0 && newWidth !== canvasWidth) {
-             p.resizeCanvas(newWidth, 400);
-             canvasWidth = newWidth;
-             p.redraw();
-             console.log(`Resized canvas to ${newWidth}x400`);
+        if (newWidth > 0 && newWidth !== canvasWidth) {
+            p.resizeCanvas(newWidth, 400);
+            canvasWidth = newWidth;
+            p.redraw();
+            console.log(`Resized canvas to ${newWidth}x400`);
         }
     };
 };
@@ -377,9 +379,9 @@ new p5(sketch);
 if (generateGraphButton) {
     generateGraphButton.addEventListener('click', () => {
         fetchAndUpdateGraphData();
-         if (typeof window.updatePortfolioStats === 'function') {
+        if (typeof window.updatePortfolioStats === 'function') {
             window.updatePortfolioStats();
-         }
+        }
     });
 } else {
     console.error("Generate Graph button not found!");
@@ -392,18 +394,18 @@ document.addEventListener('portfolioUpdated', () => {
     } else {
         console.warn("updatePortfolioStats function not found on window object.");
     }
-     if (graphStatusElement && !isFetchingGraphData) {
-         graphStatusElement.textContent = 'Portfolio changed. Click Generate/Update Graph.';
-         graphStatusElement.style.color = '#f59e0b';
-     }
+    if (graphStatusElement && !isFetchingGraphData) {
+        graphStatusElement.textContent = 'Portfolio changed. Click Generate/Update Graph.';
+        graphStatusElement.style.color = '#f59e0b';
+    }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-     if (graphStatusElement && !generateGraphButton?.disabled) {
-         graphStatusElement.textContent = 'Ready to generate graph.';
-         graphStatusElement.style.color = '#64748b';
-     }
-     if (typeof window.updatePortfolioStats === 'function') {
-         window.updatePortfolioStats();
-     }
- });
+    if (graphStatusElement && !generateGraphButton?.disabled) {
+        graphStatusElement.textContent = 'Ready to generate graph.';
+        graphStatusElement.style.color = '#64748b';
+    }
+    if (typeof window.updatePortfolioStats === 'function') {
+        window.updatePortfolioStats();
+    }
+});
