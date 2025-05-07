@@ -1,3 +1,5 @@
+import { fetchWithAuth } from '../authFetch';
+
 const portfolioStatsElement = document.querySelector(".portfolio-stats");
 if (portfolioStatsElement) {
     portfolioStatsElement.innerHTML = `
@@ -61,7 +63,7 @@ if (portfolioStatsElement) {
 
 
         try {
-            const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
+            const portfolioResponse = await fetchWithAuth('/portfolio');
             if (!portfolioResponse.ok) {
                 const errorData = await portfolioResponse.json().catch(() => ({ message: `HTTP error! status: ${portfolioResponse.status}` }));
                 throw new Error(`Failed to fetch portfolio: ${errorData.message || portfolioResponse.statusText}`);
@@ -99,7 +101,7 @@ if (portfolioStatsElement) {
             activeCountElement.textContent = activeHoldingsMap.size.toString();
 
             if (activeHoldingsMap.size > 0) {
-                const graphDataResponse = await fetch(`${API_BASE_URL}/portfolio/realtime-graph`);
+                const graphDataResponse = await fetchWithAuth('/portfolio/realtime-graph');
                 if (!graphDataResponse.ok) {
                     console.warn(`Could not fetch recent prices from graph endpoint (status: ${graphDataResponse.status}). Value calculation might be inaccurate.`);
                     valueElement.textContent = "$ -- (Price Error)";
