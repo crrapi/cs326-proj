@@ -367,30 +367,70 @@ async function deleteUser(req, res, next) {
 
 // --- Holding CRUD ---
 async function listHoldings(req, res, next) {
-    const holdings = await Holding.findAll();
-    res.json(holdings);
+    try {
+        const holdings = await Holding.findAll();
+        res.json(holdings);
+    } catch (error) {
+        next(error);
+    }
 }
 async function createHolding(req, res, next) {
-    const holding = await Holding.create(req.body);
-    res.status(201).json(holding);
+    try {
+        let holdingData = { ...req.body };
+
+        if (!holdingData.userId) {
+            const [user] = await User.findOrCreate({
+                where: { username: 'defaultUser' },
+                defaults: { username: 'defaultUser' }
+            });
+            holdingData.userId = user.id;
+        }
+
+        const holding = await Holding.create(holdingData);
+        res.status(201).json(holding);
+
+    } catch (error) {
+        console.error("Error in createHolding controller:", error);
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError' || error.name === 'SequelizeForeignKeyConstraintError') {
+            return res.status(400).json({
+                error: error.errors ? error.errors.map(e => e.message).join(', ') : 'Database operation failed'
+            });
+        }
+        next(error);
+    }
 }
+
 async function getHolding(req, res, next) {
-    const holding = await Holding.findByPk(req.params.id);
-    if (!holding) return res.status(404).json({ message: 'Holding not found' });
-    res.json(holding);
+    try {
+        const holding = await Holding.findByPk(req.params.id);
+        if (!holding) return res.status(404).json({ message: 'Holding not found' });
+        res.json(holding);
+    } catch (error) {
+        next(error);
+    }
 }
 async function updateHolding(req, res, next) {
-    const holding = await Holding.findByPk(req.params.id);
-    if (!holding) return res.status(404).json({ message: 'Holding not found' });
-    await holding.update(req.body);
-    res.json(holding);
+    try {
+        const holding = await Holding.findByPk(req.params.id);
+        if (!holding) return res.status(404).json({ message: 'Holding not found' });
+        await holding.update(req.body);
+        res.json(holding);
+    } catch (error) {
+        next(error);
+    }
 }
+
 async function deleteHolding(req, res, next) {
-    const holding = await Holding.findByPk(req.params.id);
-    if (!holding) return res.status(404).json({ message: 'Holding not found' });
-    await holding.destroy();
-    res.status(204).end();
+    try {
+        const holding = await Holding.findByPk(req.params.id);
+        if (!holding) return res.status(404).json({ message: 'Holding not found' });
+        await holding.destroy();
+        res.status(204).end();
+    } catch (error) {
+        next(error);
+    }
 }
+
 
 module.exports = {
     getPortfolio,

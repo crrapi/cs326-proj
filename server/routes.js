@@ -1,5 +1,7 @@
 const express = require('express');
 const controllers = require('./controllers');
+const validate = require('./middleware/validationMiddleware');
+const { createHoldingSchema } = require('./schemas/holdingSchema');
 
 const router = express.Router();
 
@@ -15,7 +17,7 @@ router.put('/users/:userId', controllers.updateUser);
 router.delete('/users/:userId', controllers.deleteUser);
 
 router.get('/holdings', controllers.listHoldings);
-router.post('/holdings', controllers.createHolding);
+router.post('/holdings', validate(createHoldingSchema), controllers.createHolding);
 router.get('/holdings/:id', controllers.getHolding);
 router.put('/holdings/:id', controllers.updateHolding);
 router.delete('/holdings/:id', controllers.deleteHolding);
