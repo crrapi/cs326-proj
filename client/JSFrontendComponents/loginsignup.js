@@ -3,6 +3,12 @@ const loginSignupContainer = document.querySelector('.login-signup');
 const authMessageElement = document.getElementById('auth-message');
 const API_BASE_URL = 'http://localhost:3000/api';
 
+// Check if user is already logged in
+const authToken = localStorage.getItem('authToken');
+if (authToken) {
+    window.location.href = 'main.html';
+}
+
 if (loginSignupContainer) {
     loginSignupContainer.innerHTML = `
         <h2>Login / Signup</h2>
